@@ -39,7 +39,6 @@ for i, entry in enumerate(st.session_state.tickers):
         portfolio.append((name.upper(), amt))
         total_investment += amt
 
-# 개선된 점수 함수
 def score_pe(pe): return 90 if pe is None or pe <= 0 else min(100, (pe / 60) * 70 + 30)
 def score_ps(ps): return 85 if ps is None or ps <= 0 else min(100, (ps / 15) * 65 + 25)
 def score_div_yield(dy): return 80 if dy is None or dy <= 0 else 30 if dy >= 0.05 else 50 if dy >= 0.03 else 65
@@ -111,13 +110,12 @@ if st.button("Analyze Risk") and portfolio and total_investment > 0:
 
     if weighted_risks:
         total_risk = sum(weighted_risks)
-
-        color = "#2ecc71" if total_risk <= 20 else \
-                "#27ae60" if total_risk <= 33 else \
-                "#f1c40f" if total_risk <= 45 else \
-                "#e67e22" if total_risk <= 55 else \
-                "#e74c3c" if total_risk <= 67 else \
-                "#c0392b" if total_risk <= 80 else "#8e44ad"
+        color = "#3498db" if total_risk <= 20 else \
+                "#5dade2" if total_risk <= 33 else \
+                "#2ecc71" if total_risk <= 45 else \
+                "#f4d03f" if total_risk <= 55 else \
+                "#e67e22" if total_risk <= 67 else \
+                "#e74c3c" if total_risk <= 80 else "#000000"
 
         st.markdown(f"""
         <div style='padding:15px; background-color:{color}; border-radius:8px; color:white; text-align:center; font-size:18px;'>
@@ -136,12 +134,12 @@ with st.expander("ⓘ"):
     st.markdown("""
     <div style='font-size:15px'>
     <b>What does the risk % mean?</b><br><br>
-    <span style='color:#2ecc71'><b>0–20%</b>: Extremely Low Risk</span> — peaceful<br>
-    <span style='color:#27ae60'><b>20–33%</b>: Very Low Risk</span> — Reliable companies with low volatility<br>
-    <span style='color:#f1c40f'><b>33–45%</b>: Low Risk</span> — Generally stable but some risk factors<br>
-    <span style='color:#e67e22'><b>45–55%</b>: Moderate Risk</span> — Balanced profile<br>
-    <span style='color:#e74c3c'><b>55–67%</b>: High Risk</span> — Volatile or overvalued stocks<br>
-    <span style='color:#c0392b'><b>67–80%</b>: Very High Risk</span> — Speculative or financially stressed companies<br>
-    <span style='color:#8e44ad'><b>80–100%</b>: Extremely High Risk</span> — Loss-making, hype-driven, or structurally weak firms
+    <span style='color:#3498db'><b>0–20%</b>: Extremely Low Risk</span> — peaceful<br>
+    <span style='color:#5dade2'><b>20–33%</b>: Very Low Risk</span> — Reliable companies with low volatility<br>
+    <span style='color:#2ecc71'><b>33–45%</b>: Low Risk</span> — Generally stable but some risk factors<br>
+    <span style='color:#f4d03f'><b>45–55%</b>: Moderate Risk</span> — Balanced profile<br>
+    <span style='color:#e67e22'><b>55–67%</b>: High Risk</span> — Volatile or overvalued stocks<br>
+    <span style='color:#e74c3c'><b>67–80%</b>: Very High Risk</span> — Speculative or financially stressed companies<br>
+    <span style='color:#000000'><b>80–100%</b>: Extremely High Risk</span> — Loss-making, hype-driven, or structurally weak firms
     </div>
     """, unsafe_allow_html=True)
