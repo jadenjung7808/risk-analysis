@@ -7,7 +7,6 @@ st.title("High-Sensitivity Portfolio Risk Analyzer")
 
 st.markdown("Enter stocks and investment amounts to analyze portfolio risk based on financial and volatility indicators.")
 
-# Initialize session
 if "tickers" not in st.session_state:
     st.session_state.tickers = [{"name": "", "amount": ""}]
 
@@ -112,14 +111,27 @@ if st.button("📊 Analyze Portfolio Risk") and portfolio and total_investment >
 
     if weighted_risks:
         total_risk = sum(weighted_risks)
-        st.subheader(f"🔎 Total Risk: {round(total_risk,1)}% — {interpret_risk(total_risk)}")
-        st.markdown("### 📌 Contributions:")
+
+        color = "#2ecc71" if total_risk <= 20 else \
+                "#27ae60" if total_risk <= 33 else \
+                "#f1c40f" if total_risk <= 45 else \
+                "#e67e22" if total_risk <= 55 else \
+                "#e74c3c" if total_risk <= 67 else \
+                "#c0392b" if total_risk <= 80 else "#8e44ad"
+
+        st.markdown(f"""
+        <div style='padding:15px; background-color:{color}; border-radius:8px; color:white; text-align:center; font-size:18px;'>
+        <b>Total Risk: {round(total_risk,1)}%</b><br>
+        {interpret_risk(total_risk)}
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("### 📌 Stock Contributions")
         for t, r, w in risk_contributions:
             st.write(f"**{t}** — Risk: {round(r,1)}% | Weight: {w}%")
     else:
         st.warning("No valid stock data to calculate risk.")
 
-# Color-coded and descriptive Risk % explanation
 with st.expander("ⓘ"):
     st.markdown("""
     <div style='font-size:15px'>
