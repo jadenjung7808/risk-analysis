@@ -3,7 +3,7 @@ import yfinance as yf
 import numpy as np
 
 st.set_page_config(page_title="Portfolio Risk Analyzer", layout="centered")
-st.title("High-Sensitivity Portfolio Risk Analyzer")
+st.title("Portfolio Risk Analyzer")
 
 st.markdown("Enter stocks and investment amounts to analyze portfolio risk based on financial and volatility indicators.")
 
@@ -72,9 +72,9 @@ def interpret_risk(score):
     elif score <= 80: return "Very High Risk"
     else: return "Extremely High Risk"
 
-if st.button("📊 Analyze Portfolio Risk") and portfolio and total_investment > 0:
+if st.button("Analyze Risk") and portfolio and total_investment > 0:
     st.markdown("---")
-    st.subheader("🧮 Portfolio Risk Results")
+    st.subheader("Portfolio Risk Results")
     risk_contributions = []
     weighted_risks = []
 
@@ -120,7 +120,7 @@ if st.button("📊 Analyze Portfolio Risk") and portfolio and total_investment >
         st.warning("No valid stock data to calculate risk.")
 
 # Risk % Explanation
-with st.expander("ⓘ"):
+with st.expander("risk % mean?"):
     st.markdown("""
 **What does the risk % mean?**  
 The risk percentage reflects the level of financial and market risk:
