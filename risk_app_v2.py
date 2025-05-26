@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Portfolio Risk Analyzer", layout="centered")
 st.title("Portfolio Risk Analyzer")
 
-# 🔍 Risk explanation (before stock inputs)
+# 설명: 리스크 계산 방식
 with st.expander("ℹ️ How We Calculate the Risk Score"):
     st.markdown("""
     Our risk score combines multiple indicators:
@@ -20,7 +20,7 @@ with st.expander("ℹ️ How We Calculate the Risk Score"):
     Each metric is normalized and weighted. The total score is on a 0–100 scale.
     """)
 
-# 📘 What's not included
+# 설명: 포함/제외된 데이터
 with st.expander("📘 Data Coverage & Limitations"):
     st.markdown("""
     - ✅ Public financial & market data from Yahoo Finance  
@@ -31,7 +31,7 @@ with st.expander("📘 Data Coverage & Limitations"):
     This tool only covers measurable, publicly available quantitative data.
     """)
 
-# 📥 Input section
+# 종목 입력
 if "tickers" not in st.session_state:
     st.session_state.tickers = [{"name": "", "amount": ""}]
 
@@ -59,7 +59,6 @@ for i, entry in enumerate(st.session_state.tickers):
 
 selected_period = st.selectbox("Select Investment Period", ["1mo", "3mo", "6mo", "1y", "2y"], index=2)
 
-#  Risk functions
 def interpret_risk(score):
     if score is None: return "N/A"
     elif score <= 20: return "Extremely Low Risk"
@@ -92,7 +91,8 @@ def calculate_components(ticker, period="1y"):
         stock = yf.Ticker(ticker)
         hist = stock.history(period=period)
         spy = yf.Ticker("SPY").history(period=period)
-        if hist.empty or spy.empty: return None, {}
+        if hist.empty or spy.empty:
+            return None, {}
 
         close = hist["Close"]
         volume = hist["Volume"].mean()
@@ -105,7 +105,7 @@ def calculate_components(ticker, period="1y"):
         dte = stock.info.get("debtToEquity") or 300
         margin = stock.info.get("operatingMargins") or 0.2
         avg_volume = volume or 1000000
-        esg = stock.info.get("esgScores", {}).get("totalEsg", 50)
+        esg = stock.info.get("esgScores", {}).get("totalEsg", None)
 
         weights = {
             "PE": 0.14, "PS": 0.10, "D/E": 0.10, "Margin": 0.10,
@@ -120,84 +120,83 @@ def calculate_components(ticker, period="1y"):
             "D/E": score(dte, 300) * weights["D/E"],
             "Margin": score((1 - margin), 1) * weights["Margin"],
             "Dividend": (0 if dy else 100) * weights["Dividend"],
-            "Volatility": score(vol, 0.05) * weights["Volatility"],
-            "Drawdown": score(abs(dd), 0.3) * weights["Drawdown"],
-            "Beta": score(beta or 1, 2) * weights["Beta"],
+            "Volatility": score(volatility(returns), 0.05) * weights["Volatility"],
+            "Drawdown": score(abs(drawdown(close)), 0.3) * weights["Drawdown"],
+            "Beta": score(beta_calc(returns, spy_returns) or 1, 2) * weights["Beta"],
             "Liquidity": score(1000000 / avg_volume, 1) * weights["Liquidity"],
-            "ESG": score(esg, 100) * weights["ESG"]
+            "ESG": score(esg if esg is not None else 50, 100) * weights["ESG"]
         }
 
-        total_risk = round(sum(scores.values()), 2)
-        return total_risk, scores
+        return round(sum(scores.values()), 2), scores
     except:
         return None, {}
-if st.button("📊 Analyze Risk") and portfolio:
-    st.markdown("---")
-    risks = []
-    total_amount = sum([amt for _, amt in portfolio])
 
-    for ticker, amt in portfolio:
-        r, _ = calculate_components(ticker, selected_period)
-        if r is not None:
-            risks.append((ticker, r, amt))
+# 결과 출력
+if st.button("📊 Analyze Risk"):
+    if not portfolio:
+        st.warning("⚠️ Please enter at least one valid stock and amount.")
+    else:
+        st.markdown("---")
+        risks = []
+        total_amount = sum([amt for _, amt in portfolio])
+        for ticker, amt in portfolio:
+            r, _ = calculate_components(ticker, selected_period)
+            if r is not None:
+                risks.append((ticker, r, amt))
 
-    if risks:
-        portfolio_risk = round(sum(r * a for _, r, a in risks) / total_amount, 2)
-        label = interpret_risk(portfolio_risk)
-        bg_color = risk_color(portfolio_risk)
-        st.markdown(f"""
-            <div style="background-color:{bg_color}; padding:20px; border-radius:10px">
-            <h2> Total Portfolio Risk: {portfolio_risk}%</h2>
-            <p><b>Risk Level:</b> {label}</p>
-            </div>
-        """, unsafe_allow_html=True)
+        if risks:
+            portfolio_risk = round(sum(r * a for _, r, a in risks) / total_amount, 2)
+            label = interpret_risk(portfolio_risk)
+            bg_color = risk_color(portfolio_risk)
+            st.markdown(f"""
+                <div style="background-color:{bg_color}; padding:20px; border-radius:10px">
+                <h2>📌 Total Portfolio Risk: {portfolio_risk}%</h2>
+                <p><b>Risk Level:</b> {label}</p>
+                </div>
+            """, unsafe_allow_html=True)
 
-        st.markdown("🔍 This percentage quantifies your portfolio’s total risk level based on valuation, volatility, fundamentals, liquidity, and ESG concerns.")
+        for ticker, risk, amt in risks:
+            st.subheader(f" {ticker} ({selected_period})")
+            _, scores = calculate_components(ticker, selected_period)
+            contribution = (risk * amt / total_amount)
+            st.markdown(f" Contribution to Portfolio Risk: **{contribution:.1f}%**")
 
-    for ticker, risk, amt in risks:
-        st.subheader(f" {ticker} ({selected_period})")
-        _, scores = calculate_components(ticker, selected_period)
-        label = interpret_risk(risk)
-        contribution = (risk * amt / total_amount)
-        st.markdown(f" Contribution to Portfolio Risk: **{contribution:.1f}%**")
+            top_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:3]
+            labels = [x[0] for x in top_scores]
+            values = [x[1] for x in top_scores]
+            colors = ["#3498db80", "#f39c1280", "#e74c3c80"]
 
-        top_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:3]
-        labels = [x[0] for x in top_scores]
-        values = [x[1] for x in top_scores]
-        colors = ["#3498db80", "#f39c1280", "#e74c3c80"]
+            fig, ax = plt.subplots()
+            bars = ax.bar(labels, values, color=colors)
+            for bar in bars:
+                yval = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2.0, yval, f'{yval:.1f}%', va='bottom', ha='center')
+            ax.set_ylabel("Risk Contribution (%)")
+            ax.set_title(f"{ticker} - Top 3 Risk Drivers")
+            st.pyplot(fig)
 
-        fig, ax = plt.subplots()
-        bars = ax.bar(labels, values, color=colors)
-        for bar in bars:
-            yval = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2.0, yval, f'{yval:.1f}%', va='bottom', ha='center')
-        ax.set_ylabel("Risk Contribution (%)")
-        ax.set_title(f"{ticker} - Top 3 Risk Drivers")
-        st.pyplot(fig)
-
-#  Risk % Meaning Explanation
-with st.expander("📘 Risk % ?"):
+# 리스크 % 설명
+with st.expander(" 📘 Risk % ?"):
     st.markdown("""
-    - **0–20%: Extremely Low Risk** — Very stable companies with strong financials and low volatility  
-    - **20–33%: Very Low Risk** — Reliable firms with low debt and steady returns  
-    - **33–45%: Low Risk** — Generally stable, may have modest risk factors  
-    - **45–55%: Moderate Risk** — Balanced, but some volatility or debt  
-    - **55–67%: High Risk** — Growth-oriented but potentially overvalued or volatile  
-    - **67–80%: Very High Risk** — Speculative or financially stressed stocks  
-    - **80–100%: Extremely High Risk** — Structurally weak, highly volatile, or hype-driven
+    - **0–20%: Extremely Low Risk**  
+    - **20–33%: Very Low Risk**  
+    - **33–45%: Low Risk**  
+    - **45–55%: Moderate Risk**  
+    - **55–67%: High Risk**  
+    - **67–80%: Very High Risk**  
+    - **80–100%: Extremely High Risk**
     """)
 
-# 📘 Risk Indicator Explanation
-with st.expander("📘 Risk Indicators"):
+# 리스크 지표 설명
+with st.expander("📘 Explanation of Risk Indicators"):
     st.markdown("""
-    - **PE (Price-to-Earnings Ratio)**: High PE = potentially overvalued → **Higher = Higher Risk**  
-    - **PS (Price-to-Sales Ratio)**: High PS = poor revenue efficiency → **Higher = Higher Risk**  
-    - **D/E (Debt-to-Equity)**: Higher debt load → **Higher = Higher Risk**  
-    - **Operating Margin**: Low margin = weak profitability → **Lower = Higher Risk**  
-    - **Dividend Yield**: No dividend = uncertain cash return → **Lower = Higher Risk**  
-    - **Volatility**: Price fluctuation → **Higher = Higher Risk**  
-    - **Drawdown**: Past large drops → **Larger = Higher Risk**  
-    - **Beta**: Market sensitivity → **Higher = Higher Risk**  
-    - **Liquidity (Avg Volume)**: Thin trading → **Lower volume = Higher Risk**  
-    - **ESG Score**: High ESG score = more governance/social/environmental risk → **Higher = Higher Risk**
+    - PE, PS → Higher = Higher Risk  
+    - D/E → Higher = Higher Risk  
+    - Margin → Lower = Higher Risk  
+    - Dividend → Lower = Higher Risk  
+    - Volatility → Higher = Higher Risk  
+    - Drawdown → Larger = Higher Risk  
+    - Beta → Higher = Higher Risk  
+    - Liquidity (volume) → Lower = Higher Risk  
+    - ESG Score → Higher = Higher Risk
     """)
