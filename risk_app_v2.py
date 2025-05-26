@@ -102,7 +102,7 @@ def calculate_components(ticker, period="1y"):
     except:
         return None, {}
 
-if st.button("📊 Analyze Portfolio Risk") and portfolio:
+if st.button("Analyze Risk") and portfolio:
     st.markdown("---")
     risks = []
     total_amount = sum([amt for _, amt in portfolio])
@@ -110,67 +110,61 @@ if st.button("📊 Analyze Portfolio Risk") and portfolio:
     for ticker, amt in portfolio:
         r, _ = calculate_components(ticker, selected_period)
         if r is not None:
-            risks.append((r, amt))
+            risks.append((ticker, r, amt))
 
     if risks:
-        portfolio_risk = round(sum(r * a for r, a in risks) / total_amount, 2)
+        portfolio_risk = round(sum(r * a for _, r, a in risks) / total_amount, 2)
         label = interpret_risk(portfolio_risk)
         bg_color = risk_color(portfolio_risk)
         st.markdown(f"""
             <div style="background-color:{bg_color}; padding:20px; border-radius:10px">
-            <h2> Total Portfolio Risk: {portfolio_risk}%</h2>
+            <h2>Total Portfolio Risk: {portfolio_risk}%</h2>
             <p><b>Risk Level:</b> {label}</p>
             </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("🔍 This percentage represents the overall investment risk level of your portfolio, based on valuation, debt, profitability, volatility, and market sensitivity. A higher value indicates greater instability and exposure to potential losses.")
+        st.markdown(" This percentage quantifies your portfolio’s total risk level based on valuation, debt, volatility, and market sensitivity.")
 
-    for ticker, amt in portfolio:
-        st.subheader(f"📍 {ticker} ({selected_period})")
-        risk, scores = calculate_components(ticker, selected_period)
-        if risk is not None:
-            label = interpret_risk(risk)
-            top_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:3]
-            labels = [x[0] for x in top_scores]
-            values = [x[1] for x in top_scores]
-            colors = ["#3498db80", "#f39c1280", "#e74c3c80"]
+    for ticker, risk, amt in risks:
+        st.subheader(f" {ticker} ({selected_period})")
+        _, scores = calculate_components(ticker, selected_period)
+        label = interpret_risk(risk)
+        contribution = (risk * amt / total_amount)
+        st.markdown(f" Contribution to Portfolio Risk: **{contribution:.1f}%**")
 
-            fig, ax = plt.subplots()
-            bars = ax.bar(labels, values, color=colors)
-            for bar in bars:
-                yval = bar.get_height()
-                ax.text(bar.get_x() + bar.get_width()/2.0, yval, f'{yval:.1f}%', va='bottom', ha='center')
-            ax.set_ylabel("Risk Contribution (%)")
-            ax.set_title(f"{ticker} - Top 3 Risk Drivers")
-            st.pyplot(fig)
+        top_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:3]
+        labels = [x[0] for x in top_scores]
+        values = [x[1] for x in top_scores]
+        colors = ["#3498db80", "#f39c1280", "#e74c3c80"]
 
-with st.expander("Risk %?"):
+        fig, ax = plt.subplots()
+        bars = ax.bar(labels, values, color=colors)
+        for bar in bars:
+            yval = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2.0, yval, f'{yval:.1f}%', va='bottom', ha='center')
+        ax.set_ylabel("Risk Contribution (%)")
+        ax.set_title(f"{ticker} - Top 3 Risk Drivers")
+        st.pyplot(fig)
+
+with st.expander(" Risk %?"):
     st.markdown("""
-    - **0–20%: Extremely Low Risk** — Stable, conservative stocks with consistent earnings and low volatility  
-    - **20–33%: Very Low Risk** — Reliable companies with low market exposure  
-    - **33–45%: Low Risk** — Mostly stable, may have slight valuation or leverage risks  
-    - **45–55%: Moderate Risk** — Balanced
-    - **55–67%: High Risk** — Growth or speculative stocks, likely volatile or overvalued  
-    - **67–80%: Very High Risk** — Weak financials, speculative business models  
-    - **80–100%: Extremely High Risk** — Hype-driven, structurally unstable, loss-making
+    - **0–20%: Extremely Low Risk** — Very stable companies with strong financials and low volatility  
+    - **20–33%: Very Low Risk** — Reliable firms with low debt and steady returns  
+    - **33–45%: Low Risk** — Generally stable, may have modest risk factors  
+    - **45–55%: Moderate Risk** — Balanced, but some volatility or debt  
+    - **55–67%: High Risk** — Growth-oriented but potentially overvalued or volatile  
+    - **67–80%: Very High Risk** — Speculative or financially stressed stocks  
+    - **80–100%: Extremely High Risk** — Structurally weak, highly volatile, or hype-driven
     """)
 
 with st.expander("📘 Risk Indicators"):
     st.markdown("""
-    - **PE (Price-to-Earnings Ratio)**  
-      High = expensive relative to earnings → **Higher PE = Higher Risk**
-    - **PS (Price-to-Sales Ratio)**  
-      High = weak revenue relative to price → **Higher PS = Higher Risk**
-    - **D/E (Debt-to-Equity)**  
-      High = more debt leverage → **Higher D/E = Higher Risk**
-    - **Operating Margin**  
-      Low = inefficient operations → **Lower Margin = Higher Risk**
-    - **Dividend Yield**  
-      Absent or low = no cash return → **Lower Yield = Higher Risk**
-    - **Volatility**  
-      High = unstable price movements → **Higher Volatility = Higher Risk**
-    - **Drawdown**  
-      Big past drop from peak = risk of losses → **Larger Drawdown = Higher Risk**
-    - **Beta**  
-      High = sensitive to market → **Higher Beta = Higher Risk**
+    - **PE (Price-to-Earnings Ratio)**: High PE means potentially overvalued → **Higher = Higher Risk**  
+    - **PS (Price-to-Sales Ratio)**: High PS suggests high price vs revenue → **Higher = Higher Risk**  
+    - **D/E (Debt-to-Equity Ratio)**: More debt = more risk → **Higher = Higher Risk**  
+    - **Operating Margin**: Low margin = inefficiency → **Lower = Higher Risk**  
+    - **Dividend Yield**: No dividends = uncertain returns → **Lower = Higher Risk**  
+    - **Volatility**: Fluctuating price → **Higher = Higher Risk**  
+    - **Drawdown**: Large past losses → **Larger = Higher Risk**  
+    - **Beta**: Sensitivity to market → **Higher = Higher Risk**
     """)
