@@ -1,11 +1,12 @@
 import streamlit as st
 import yfinance as yf
 import numpy as np
+import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="Portfolio Risk Analyzer", layout="centered")
-st.title("Portfolio Risk Analyzer")
+st.set_page_config(page_title="Investment Risk Analyzer", layout="centered")
+st.title("📊 Multi-Period Investment Risk Analyzer")
 
-st.markdown("Enter stocks and investment amounts to analyze portfolio risk based on financial and volatility indicators.")
+st.markdown("Analyze risk of individual stocks based on financial and volatility indicators across different investment periods.")
 
 if "tickers" not in st.session_state:
     st.session_state.tickers = [{"name": "", "amount": ""}]
@@ -16,55 +17,30 @@ def add_row():
 def remove_row(index):
     st.session_state.tickers.pop(index)
 
-st.button("➕ Add Stock", on_click=add_row)
-
 portfolio = []
 total_investment = 0
+
+st.button("➕ Add Stock", on_click=add_row)
 
 for i, entry in enumerate(st.session_state.tickers):
     cols = st.columns([2, 1, 0.3])
     name = cols[0].text_input(f"Stock Name {i+1}", value=entry["name"], key=f"name_{i}", placeholder="e.g., AAPL")
-    amount = cols[1].text_input("Amount ($)", value=entry["amount"], key=f"amount_{i}")
+    amount = cols[1].text_input("Amount ($)", value=entry["amount"], key=f"amount_{i}", placeholder="$")
     remove = cols[2].button("❌", key=f"remove_{i}")
-
     if remove:
         remove_row(i)
         st.rerun()
-
     st.session_state.tickers[i]["name"] = name
     st.session_state.tickers[i]["amount"] = amount
-
     if name and amount.replace(".", "", 1).isdigit():
-        amt = float(amount)
-        portfolio.append((name.upper(), amt))
-        total_investment += amt
+        portfolio.append((name.upper(), float(amount)))
+        total_investment += float(amount)
 
-def score_pe(pe): return 90 if pe is None or pe <= 0 else min(100, (pe / 60) * 70 + 30)
-def score_ps(ps): return 85 if ps is None or ps <= 0 else min(100, (ps / 15) * 65 + 25)
-def score_div_yield(dy): return 80 if dy is None or dy <= 0 else 30 if dy >= 0.05 else 50 if dy >= 0.03 else 65
-def score_debt_to_equity(dte): return 85 if dte is None or dte <= 0 else min(100, (dte / 300) * 70 + 30)
-def score_operating_margin(m): return 80 if m is None else 30 if m > 0.2 else 50 if m > 0.1 else 75
-def score_volatility(std): return min(std * 1000, 100)
-def score_drawdown(mdd): return min(abs(mdd) * 100, 100)
-def score_beta(beta): return 50 if beta is None else min(abs(beta) * 50, 100)
-
-def weighted_score(pe, ps, dy, dte, margin, vol, dd, beta):
-    weights = {"pe": 0.18, "ps": 0.12, "dte": 0.12, "margin": 0.12,
-               "div": 0.06, "vol": 0.16, "dd": 0.12, "beta": 0.12}
-    raw_score = (
-        score_pe(pe) * weights["pe"] +
-        score_ps(ps) * weights["ps"] +
-        score_div_yield(dy) * weights["div"] +
-        score_debt_to_equity(dte) * weights["dte"] +
-        score_operating_margin(margin) * weights["margin"] +
-        score_volatility(vol) * weights["vol"] +
-        score_drawdown(dd) * weights["dd"] +
-        score_beta(beta) * weights["beta"]
-    )
-    return min(raw_score ** 0.97, 100)
+custom_periods = st.multiselect("Select additional custom periods", ["1mo", "3mo", "6mo", "1y", "2y"], default=["6mo"])
 
 def interpret_risk(score):
-    if score <= 20: return "Extremely Low Risk"
+    if score is None: return "N/A"
+    elif score <= 20: return "Extremely Low Risk"
     elif score <= 33: return "Very Low Risk"
     elif score <= 45: return "Low Risk"
     elif score <= 55: return "Moderate Risk"
@@ -72,68 +48,89 @@ def interpret_risk(score):
     elif score <= 80: return "Very High Risk"
     else: return "Extremely High Risk"
 
-if st.button("Analyze Risk") and portfolio and total_investment > 0:
-    st.markdown("---")
-    st.subheader("Portfolio Risk Results")
-    risk_contributions = []
-    weighted_risks = []
+def risk_color(score):
+    if score is None: return "#bdc3c7"
+    elif score <= 20: return "#3498db"
+    elif score <= 33: return "#5dade2"
+    elif score <= 45: return "#2ecc71"
+    elif score <= 55: return "#f4d03f"
+    elif score <= 67: return "#e67e22"
+    elif score <= 80: return "#e74c3c"
+    else: return "#000000"
 
-    for ticker, amt in portfolio:
-        try:
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period="1y")
-            info = stock.info
-            if hist.empty:
-                st.warning(f"No data for {ticker}")
-                continue
+def volatility(returns): return np.std(returns)
+def drawdown(close): return (close / close.cummax() - 1).min()
+def beta_calc(returns, benchmark_returns):
+    if len(returns) != len(benchmark_returns): return None
+    cov_matrix = np.cov(returns, benchmark_returns)
+    return cov_matrix[0, 1] / cov_matrix[1, 1]
 
-            close = hist["Close"]
-            returns = close.pct_change().dropna()
+def calculate_components(ticker, period="1y"):
+    try:
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period=period)
+        spy = yf.Ticker("SPY").history(period=period)
+        if hist.empty or spy.empty:
+            return None, {}
 
-            pe = info.get("forwardPE")
-            ps = info.get("priceToSalesTrailing12Months")
-            dy = info.get("dividendYield")
-            dte = info.get("debtToEquity")
-            margin = info.get("operatingMargins")
-            vol = np.std(returns)
-            dd = (close / close.cummax() - 1).min()
-            beta = info.get("beta")
+        close = hist["Close"]
+        returns = close.pct_change().dropna()
+        spy_returns = spy["Close"].pct_change().dropna()
 
-            risk = weighted_score(pe, ps, dy, dte, margin, vol, dd, beta)
-            risk = min(risk, 100)
+        pe = stock.info.get("forwardPE")
+        ps = stock.info.get("priceToSalesTrailing12Months")
+        dy = stock.info.get("dividendYield")
+        dte = stock.info.get("debtToEquity")
+        margin = stock.info.get("operatingMargins")
 
-            weight = amt / total_investment
-            weighted_risks.append(risk * weight)
-            risk_contributions.append((ticker, risk, round(weight * 100, 1)))
-        except Exception as e:
-            st.error(f"{ticker}: Failed to analyze. {e}")
+        vol = volatility(returns)
+        dd = drawdown(close)
+        beta = beta_calc(returns, spy_returns)
 
-    if weighted_risks:
-        total_risk = sum(weighted_risks)
-        color = "#3498db" if total_risk <= 20 else \
-                "#5dade2" if total_risk <= 33 else \
-                "#2ecc71" if total_risk <= 45 else \
-                "#f4d03f" if total_risk <= 55 else \
-                "#e67e22" if total_risk <= 67 else \
-                "#e74c3c" if total_risk <= 80 else "#000000"
+        weights = {"PE": 0.18, "PS": 0.12, "D/E": 0.12, "Margin": 0.12,
+                   "Dividend": 0.06, "Volatility": 0.16, "Drawdown": 0.12, "Beta": 0.12}
 
-        st.markdown(f"""
-        <div style='padding:15px; background-color:{color}; border-radius:8px; color:white; text-align:center; font-size:18px;'>
-        <b>Total Risk: {round(total_risk,1)}%</b><br>
-        {interpret_risk(total_risk)}
-        </div>
-        """, unsafe_allow_html=True)
+        def score(x, scale): return 100 if x is None else min(x / scale, 1) * 100
+        scores = {
+            "PE": score(pe if pe and pe > 0 else 60, 60) * weights["PE"],
+            "PS": score(ps if ps and ps > 0 else 15, 15) * weights["PS"],
+            "D/E": score(dte if dte and dte > 0 else 300, 300) * weights["D/E"],
+            "Margin": score((1 - margin) if margin else 0.8, 1) * weights["Margin"],
+            "Dividend": (0 if dy else 100) * weights["Dividend"],
+            "Volatility": score(vol, 0.05) * weights["Volatility"],
+            "Drawdown": score(abs(dd), 0.3) * weights["Drawdown"],
+            "Beta": score(beta, 2) * weights["Beta"],
+        }
 
-        st.markdown("### Stock Contributions")
-        for t, r, w in risk_contributions:
-            st.write(f"**{t}** — Risk: {round(r,1)}% | Weight: {w}%")
-    else:
-        st.warning("No valid stock data to calculate risk.")
+        total_risk = sum(scores.values())
+        return total_risk, scores
+    except:
+        return None, {}
 
-with st.expander("ⓘ"):
+if st.button("📊 Analyze Risk") and portfolio:
+    for ticker, amount in portfolio:
+        st.markdown(f"---\n### 🧾 {ticker}")
+        short, _ = calculate_components(ticker, "1mo")
+        long, _ = calculate_components(ticker, "1y")
+        st.markdown(f"**Short-Term Risk (1mo):** `{round(short,1) if short else 'N/A'}%` — {interpret_risk(short)}")
+        st.markdown(f"**Long-Term Risk (1y):** `{round(long,1) if long else 'N/A'}%` — {interpret_risk(long)}")
+
+        for cp in custom_periods:
+            risk, scores = calculate_components(ticker, cp)
+            st.markdown(f"**Custom Period Risk ({cp}):** `{round(risk,1) if risk else 'N/A'}%` — {interpret_risk(risk)}")
+            if scores:
+                labels = list(scores.keys())
+                values = list(scores.values())
+                fig, ax = plt.subplots()
+                ax.pie(values, labels=labels, autopct="%1.1f%%", startangle=90)
+                ax.axis("equal")
+                st.markdown(f"**Risk Contribution Breakdown (Period: {cp})**")
+                st.pyplot(fig)
+
+with st.expander("ℹ️ What does the risk % mean?"):
     st.markdown("""
     <div style='font-size:15px'>
-    <b>What does the risk % mean?</b><br><br>
+    <b>Risk Level Interpretation</b><br><br>
     <span style='color:#3498db'><b>0–20%</b>: Extremely Low Risk</span> — peaceful<br>
     <span style='color:#5dade2'><b>20–33%</b>: Very Low Risk</span> — Reliable companies with low volatility<br>
     <span style='color:#2ecc71'><b>33–45%</b>: Low Risk</span> — Generally stable but some risk factors<br>
