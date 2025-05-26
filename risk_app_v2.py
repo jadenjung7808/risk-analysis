@@ -2,7 +2,7 @@ import streamlit as st
 import yfinance as yf
 import numpy as np
 
-st.set_page_config(page_title="Advanced Risk Analyzer", layout="centered")
+st.set_page_config(page_title="Risk Analyzer", layout="centered")
 st.title("Advanced Investment Risk Analyzer")
 
 st.subheader("Enter stock information")
