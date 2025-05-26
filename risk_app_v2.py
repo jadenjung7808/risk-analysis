@@ -3,7 +3,7 @@ import yfinance as yf
 import numpy as np
 
 st.set_page_config(page_title="Portfolio Risk Analyzer", layout="centered")
-st.title("High-Sensitivity Portfolio Risk Analyzer")
+st.title("Portfolio Risk Analyzer")
 
 st.markdown("This tool analyzes the risk of your portfolio based on individual stock risk and weighted exposure.")
 
@@ -29,7 +29,7 @@ for i, entry in enumerate(st.session_state.tickers):
     cols = st.columns([2, 1, 0.5])
     name = cols[0].text_input(f"Stock Name {i+1}", value=entry["name"], key=f"name_{i}", placeholder="e.g., AAPL")
     amount = cols[1].number_input("Amount", min_value=0.0, step=100.0, value=entry["amount"], key=f"amount_{i}")
-    remove = cols[2].button("❌", key=f"remove_{i}")
+    remove = cols[2].button("X", key=f"remove_{i}")
     
     if remove:
         remove_row(i)
