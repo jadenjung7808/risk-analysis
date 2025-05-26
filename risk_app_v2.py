@@ -3,7 +3,7 @@ import yfinance as yf
 import numpy as np
 
 st.set_page_config(page_title="Portfolio Risk Analyzer", layout="centered")
-st.title("High-Sensitivity Portfolio Risk Analyzer")
+st.title("Portfolio Risk Analyzer")
 
 st.markdown("Enter stocks and investment amounts to analyze portfolio risk based on financial and volatility indicators.")
 
@@ -71,9 +71,9 @@ def interpret_risk(score):
     elif score <= 80: return "Very High Risk"
     else: return "Extremely High Risk"
 
-if st.button("📊 Analyze Portfolio Risk") and portfolio and total_investment > 0:
+if st.button("Analyze Risk") and portfolio and total_investment > 0:
     st.markdown("---")
-    st.subheader("🧮 Portfolio Risk Results")
+    st.subheader("Portfolio Risk Results")
     risk_contributions = []
     weighted_risks = []
 
@@ -126,7 +126,7 @@ if st.button("📊 Analyze Portfolio Risk") and portfolio and total_investment >
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("### 📌 Stock Contributions")
+        st.markdown("### Stock Contributions")
         for t, r, w in risk_contributions:
             st.write(f"**{t}** — Risk: {round(r,1)}% | Weight: {w}%")
     else:
