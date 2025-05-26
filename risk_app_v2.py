@@ -1,28 +1,22 @@
-
 import streamlit as st
 import yfinance as yf
 import numpy as np
 
-st.set_page_config(page_title="Investment Risk Analyzer", layout="centered")
-st.title("Investment Risk Percentage Calculator")
+st.set_page_config(page_title="Advanced Risk Analyzer", layout="centered")
+st.title("Advanced Investment Risk Analyzer")
 
 st.subheader("Enter stock information")
 ticker = st.text_input("Stock Ticker (e.g., AAPL, MSFT, TSLA)", value="AAPL")
 investment = st.number_input("Investment Amount (USD)", min_value=100.0, step=100.0)
 
-weights = {
-    "volatility": 0.25,
-    "max_drawdown": 0.10,
-    "beta": 0.05,
-    "sector": 0.05,
-    "concentration": 0.05,
-    "debt_to_equity": 0.20,
-    "operating_margin": 0.10,
-    "dividend_yield": 0.03,
-    "ps_ratio": 0.10,
-    "forward_pe": 0.07
+# Risk category weights
+category_weights = {
+    "market": 0.4,
+    "financial": 0.3,
+    "valuation": 0.3
 }
 
+# Sector risk mapping
 sector_risk_map = {
     "Technology": 60, "Energy": 80, "Healthcare": 40, "Financial Services": 55,
     "Industrials": 65, "Consumer Defensive": 35, "Utilities": 30,
@@ -30,17 +24,48 @@ sector_risk_map = {
     "Basic Materials": 60, "Real Estate": 70, "Unknown": 50
 }
 
-def score_pe(pe):
-    if pe is None or pe <= 0:
-        return 90
-    elif pe < 10:
-        return 40
-    elif pe <= 25:
+# Scoring functions
+def score_volatility(std):
+    return min(std * 1000, 100)
+
+def score_drawdown(mdd):
+    return min(abs(mdd) * 100, 100)
+
+def score_beta(beta):
+    return 50 if beta is None else min(abs(beta) * 50, 100)
+
+def score_sector(sector):
+    return sector_risk_map.get(sector, 50)
+
+def score_debt_to_equity(dte):
+    if dte is None or dte <= 0:
+        return 80
+    elif dte < 50:
+        return 30
+    elif dte <= 200:
         return 60
-    elif pe <= 40:
-        return 75
     else:
         return 90
+
+def score_operating_margin(margin):
+    if margin is None:
+        return 80
+    elif margin > 0.2:
+        return 30
+    elif margin > 0.1:
+        return 50
+    else:
+        return 80
+
+def score_div_yield(dy):
+    if dy is None or dy <= 0:
+        return 75
+    elif dy >= 0.05:
+        return 30
+    elif dy >= 0.03:
+        return 50
+    else:
+        return 65
 
 def score_ps(ps):
     if ps is None or ps <= 0:
@@ -54,16 +79,19 @@ def score_ps(ps):
     else:
         return 90
 
-def score_div_yield(dy):
-    if dy is None or dy <= 0:
+def score_pe(pe):
+    if pe is None or pe <= 0:
+        return 90
+    elif pe < 10:
+        return 40
+    elif pe <= 25:
+        return 60
+    elif pe <= 40:
         return 75
-    elif dy >= 0.05:
-        return 30
-    elif dy >= 0.03:
-        return 50
     else:
-        return 65
+        return 90
 
+# Main logic
 if st.button("Analyze Risk") and ticker:
     try:
         stock = yf.Ticker(ticker)
@@ -76,73 +104,60 @@ if st.button("Analyze Risk") and ticker:
             close = hist["Close"]
             returns = close.pct_change().dropna()
 
-            volatility = np.std(returns)
-            volatility_score = min(volatility * 1000, 100)
+            # MARKET RISK
+            volatility_score = score_volatility(np.std(returns))
+            drawdown_score = score_drawdown((close / close.cummax() - 1).min())
+            beta_score = score_beta(info.get("beta"))
+            sector_score = score_sector(info.get("sector", "Unknown"))
 
-            running_max = close.cummax()
-            drawdown = (close - running_max) / running_max
-            max_dd = drawdown.min()
-            drawdown_score = min(abs(max_dd) * 100, 100)
+            market_risk = np.mean([volatility_score, drawdown_score, beta_score, sector_score])
 
-            beta_score = min(abs(info.get("beta", 1)) * 50, 100)
+            # FINANCIAL RISK
+            dte_score = score_debt_to_equity(info.get("debtToEquity"))
+            margin_score = score_operating_margin(info.get("operatingMargins"))
+            dividend_score = score_div_yield(info.get("dividendYield"))
 
-            sector = info.get("sector", "Unknown")
-            sector_score = sector_risk_map.get(sector, 50)
+            financial_risk = np.mean([dte_score, margin_score, dividend_score])
 
-            concentration_score = 80
+            # VALUATION RISK
+            ps_score = score_ps(info.get("priceToSalesTrailing12Months"))
+            pe_score = score_pe(info.get("forwardPE"))
 
-            dte = info.get("debtToEquity", None)
-            debt_score = 80 if dte is None else min(dte * 0.2, 100)
+            valuation_risk = np.mean([ps_score, pe_score])
 
-            margin = info.get("operatingMargins", None)
-            margin_score = 80
-            if margin is not None:
-                margin_score = 100 - (margin * 200)
-                margin_score = max(min(margin_score, 100), 0)
-
-            div_yield = info.get("dividendYield", None)
-            div_score = score_div_yield(div_yield)
-
-            ps = info.get("priceToSalesTrailing12Months", None)
-            ps_score = score_ps(ps)
-
-            pe = info.get("forwardPE", None)
-            pe_score = score_pe(pe)
-
-            risk_percent = (
-                weights["volatility"] * volatility_score +
-                weights["max_drawdown"] * drawdown_score +
-                weights["beta"] * beta_score +
-                weights["sector"] * sector_score +
-                weights["concentration"] * concentration_score +
-                weights["debt_to_equity"] * debt_score +
-                weights["operating_margin"] * margin_score +
-                weights["dividend_yield"] * div_score +
-                weights["ps_ratio"] * ps_score +
-                weights["forward_pe"] * pe_score
+            # Weighted total risk
+            overall_risk = (
+                category_weights["market"] * market_risk +
+                category_weights["financial"] * financial_risk +
+                category_weights["valuation"] * valuation_risk
             )
 
-            st.subheader(f"Overall Risk: {round(risk_percent, 1)}%")
-            if risk_percent <= 20:
+            # Display result
+            st.subheader(f"Total Risk Score: {round(overall_risk, 1)}%")
+            if overall_risk <= 20:
                 st.success("Risk Level: Very Low")
-            elif risk_percent <= 40:
+            elif overall_risk <= 40:
                 st.success("Risk Level: Low")
-            elif risk_percent <= 60:
+            elif overall_risk <= 60:
                 st.warning("Risk Level: Moderate")
-            elif risk_percent <= 80:
+            elif overall_risk <= 80:
                 st.warning("Risk Level: High")
             else:
                 st.error("Risk Level: Very High")
 
-            st.markdown("### Breakdown by Indicator")
+            st.markdown("### Risk Breakdown")
+            st.write(f"Market Risk: {round(market_risk)}%")
+            st.write(f"Financial Risk: {round(financial_risk)}%")
+            st.write(f"Valuation Risk: {round(valuation_risk)}%")
+
+            st.markdown("### Indicator Scores")
             st.write(f"Volatility: {round(volatility_score)}")
             st.write(f"Max Drawdown: {round(drawdown_score)}")
             st.write(f"Beta: {round(beta_score)}")
-            st.write(f"Sector Risk: {round(sector_score)}")
-            st.write(f"Concentration: {concentration_score}")
-            st.write(f"Debt to Equity: {round(debt_score)}")
+            st.write(f"Sector: {round(sector_score)}")
+            st.write(f"Debt to Equity: {round(dte_score)}")
             st.write(f"Operating Margin: {round(margin_score)}")
-            st.write(f"Dividend Yield: {round(div_score)}")
+            st.write(f"Dividend Yield: {round(dividend_score)}")
             st.write(f"P/S Ratio: {round(ps_score)}")
             st.write(f"Forward P/E: {round(pe_score)}")
 
