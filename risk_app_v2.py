@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Investment Risk Analyzer", layout="centered")
-st.title("📊 Multi-Period Investment Risk Analyzer")
+st.title("Investment Risk Analyzer")
 
 st.markdown("Analyze risk of individual stocks based on financial and volatility indicators across different investment periods.")
 
@@ -107,7 +107,7 @@ def calculate_components(ticker, period="1y"):
     except:
         return None, {}
 
-if st.button("📊 Analyze Risk") and portfolio:
+if st.button("Analyze Risk") and portfolio:
     for ticker, amount in portfolio:
         st.markdown(f"---\n### 🧾 {ticker}")
         short, _ = calculate_components(ticker, "1mo")
@@ -127,7 +127,7 @@ if st.button("📊 Analyze Risk") and portfolio:
                 st.markdown(f"**Risk Contribution Breakdown (Period: {cp})**")
                 st.pyplot(fig)
 
-with st.expander("ℹ️ What does the risk % mean?"):
+with st.expander("ℹ️ risk %?"):
     st.markdown("""
     <div style='font-size:15px'>
     <b>Risk Level Interpretation</b><br><br>
