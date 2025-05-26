@@ -4,39 +4,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Investment Risk Analyzer", layout="centered")
-st.title("Investment Risk Analyzer")
+st.title("🎯 Enhanced Risk Analyzer")
 
-st.markdown("Analyze risk of individual stocks based on financial and volatility indicators across different investment periods.")
+st.markdown("Enter a stock ticker and investment amount to analyze risk based on selected time period.")
 
-if "tickers" not in st.session_state:
-    st.session_state.tickers = [{"name": "", "amount": ""}]
+st.markdown("### Enter Your Portfolio")
 
-def add_row():
-    st.session_state.tickers.append({"name": "", "amount": ""})
+ticker = st.text_input("Stock Name", value="", placeholder="e.g., AAPL")
+amount = st.text_input("Investment Amount (USD)", value="", placeholder="$")
 
-def remove_row(index):
-    st.session_state.tickers.pop(index)
-
-portfolio = []
-total_investment = 0
-
-st.button("➕ Add Stock", on_click=add_row)
-
-for i, entry in enumerate(st.session_state.tickers):
-    cols = st.columns([2, 1, 0.3])
-    name = cols[0].text_input(f"Stock Name {i+1}", value=entry["name"], key=f"name_{i}", placeholder="e.g., AAPL")
-    amount = cols[1].text_input("Amount ($)", value=entry["amount"], key=f"amount_{i}", placeholder="$")
-    remove = cols[2].button("❌", key=f"remove_{i}")
-    if remove:
-        remove_row(i)
-        st.rerun()
-    st.session_state.tickers[i]["name"] = name
-    st.session_state.tickers[i]["amount"] = amount
-    if name and amount.replace(".", "", 1).isdigit():
-        portfolio.append((name.upper(), float(amount)))
-        total_investment += float(amount)
-
-custom_periods = st.multiselect("Select additional custom periods", ["1mo", "3mo", "6mo", "1y", "2y"], default=["6mo"])
+selected_period = st.selectbox("Select Investment Period", ["1mo", "3mo", "6mo", "1y", "2y"], index=2)
 
 def interpret_risk(score):
     if score is None: return "N/A"
@@ -49,14 +26,14 @@ def interpret_risk(score):
     else: return "Extremely High Risk"
 
 def risk_color(score):
-    if score is None: return "#bdc3c7"
-    elif score <= 20: return "#3498db"
-    elif score <= 33: return "#5dade2"
-    elif score <= 45: return "#2ecc71"
-    elif score <= 55: return "#f4d03f"
-    elif score <= 67: return "#e67e22"
-    elif score <= 80: return "#e74c3c"
-    else: return "#000000"
+    if score is None: return "#ecf0f1"
+    elif score <= 20: return "rgba(52, 152, 219, 0.25)"     # Blue
+    elif score <= 33: return "rgba(93, 173, 226, 0.25)"     # Sky
+    elif score <= 45: return "rgba(46, 204, 113, 0.25)"     # Green
+    elif score <= 55: return "rgba(244, 208, 63, 0.25)"     # Yellow
+    elif score <= 67: return "rgba(230, 126, 34, 0.25)"     # Orange
+    elif score <= 80: return "rgba(231, 76, 60, 0.25)"      # Red
+    else: return "rgba(0, 0, 0, 0.25)"                      # Black
 
 def volatility(returns): return np.std(returns)
 def drawdown(close): return (close / close.cummax() - 1).min()
@@ -107,36 +84,41 @@ def calculate_components(ticker, period="1y"):
     except:
         return None, {}
 
-if st.button("Analyze Risk") and portfolio:
-    for ticker, amount in portfolio:
-        st.markdown(f"---\n### 🧾 {ticker}")
-        short, _ = calculate_components(ticker, "1mo")
-        long, _ = calculate_components(ticker, "1y")
-        st.markdown(f"**Short-Term Risk (1mo):** `{round(short,1) if short else 'N/A'}%` — {interpret_risk(short)}")
-        st.markdown(f"**Long-Term Risk (1y):** `{round(long,1) if long else 'N/A'}%` — {interpret_risk(long)}")
+if st.button("Analyze Risk") and ticker and amount.replace(".", "", 1).isdigit():
+    ticker = ticker.upper()
+    st.markdown("---")
+    st.subheader(f"🧾 {ticker} — Period: {selected_period}")
+    risk, components = calculate_components(ticker, selected_period)
 
-        for cp in custom_periods:
-            risk, scores = calculate_components(ticker, cp)
-            st.markdown(f"**Custom Period Risk ({cp}):** `{round(risk,1) if risk else 'N/A'}%` — {interpret_risk(risk)}")
-            if scores:
-                labels = list(scores.keys())
-                values = list(scores.values())
-                fig, ax = plt.subplots()
-                ax.pie(values, labels=labels, autopct="%1.1f%%", startangle=90)
-                ax.axis("equal")
-                st.markdown(f"**Risk Contribution Breakdown (Period: {cp})**")
-                st.pyplot(fig)
+    if risk is not None:
+        interpretation = interpret_risk(risk)
+        bg_color = risk_color(risk)
+        st.markdown(f"""
+            <div style="background-color:{bg_color}; padding:20px; border-radius:10px">
+            <h3>📌 Total Risk: {round(risk,1)}%</h3>
+            <p><b>Risk Level:</b> {interpretation}</p>
+            </div>
+        """, unsafe_allow_html=True)
 
-with st.expander("ℹ️ risk %?"):
+        sorted_scores = sorted(components.items(), key=lambda x: x[1], reverse=True)[:3]
+        labels = [item[0] for item in sorted_scores]
+        values = [item[1] for item in sorted_scores]
+        colors = ["#3498db80", "#f39c1280", "#e74c3c80"]
+
+        fig, ax = plt.subplots()
+        ax.bar(labels, values, color=colors)
+        ax.set_ylabel("Risk Contribution (%)")
+        ax.set_title("Top 3 Risk Contributors")
+        st.pyplot(fig)
+
+with st.expander("ℹ️ Indicator Descriptions"):
     st.markdown("""
-    <div style='font-size:15px'>
-    <b>Risk Level Interpretation</b><br><br>
-    <span style='color:#3498db'><b>0–20%</b>: Extremely Low Risk</span> — peaceful<br>
-    <span style='color:#5dade2'><b>20–33%</b>: Very Low Risk</span> — Reliable companies with low volatility<br>
-    <span style='color:#2ecc71'><b>33–45%</b>: Low Risk</span> — Generally stable but some risk factors<br>
-    <span style='color:#f4d03f'><b>45–55%</b>: Moderate Risk</span> — Balanced profile<br>
-    <span style='color:#e67e22'><b>55–67%</b>: High Risk</span> — Volatile or overvalued stocks<br>
-    <span style='color:#e74c3c'><b>67–80%</b>: Very High Risk</span> — Speculative or financially stressed companies<br>
-    <span style='color:#000000'><b>80–100%</b>: Extremely High Risk</span> — Loss-making, hype-driven, or structurally weak firms
-    </div>
-    """, unsafe_allow_html=True)
+    - **PE (Price-to-Earnings Ratio)**: Indicates how much investors are paying for $1 of earnings. High PE may signal overvaluation.
+    - **PS (Price-to-Sales Ratio)**: Compares stock price to revenues. High PS may indicate overpricing relative to sales.
+    - **D/E (Debt-to-Equity)**: Measures financial leverage. High D/E = high risk of default.
+    - **Operating Margin**: Profitability indicator. Low margin = inefficient operations = higher risk.
+    - **Dividend Yield**: Indicates cash return. No dividend = potentially risky growth stock.
+    - **Volatility**: Price fluctuation intensity. Higher volatility = higher risk.
+    - **Drawdown**: Maximum historical drop from peak. Reflects loss potential.
+    - **Beta**: Sensitivity to market movements. Higher beta = more reactive to market swings.
+    """)
