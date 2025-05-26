@@ -125,11 +125,11 @@ with st.expander("risk % mean?"):
 **What does the risk % mean?**  
 The risk percentage reflects the level of financial and market risk:
 
-- **0–20%**: Extremely Low Risk  
-- **20–33%**: Very Low Risk  
-- **33–45%**: Low Risk  
-- **45–55%**: Moderate Risk  
-- **55–67%**: High Risk  
-- **67–80%**: Very High Risk  
-- **80–100%**: Extremely High Risk
+- **0–20%**: Extremely Low Risk — peaceful
+- **20–33%**: Very Low Risk — Reliable companies with low volatility 
+- **33–45%**: Low Risk — Generally stable but some risk factors  
+- **45–55%**: Moderate Risk — Balanced profile 
+- **55–67%**: High Risk — Volatile or overvalued stocks  
+- **67–80%**: Very High Risk — Speculative or financially stressed companies  
+- **80–100%**: Extremely High Risk — Loss-making, hype-driven, or structurally weak firms
 """)
