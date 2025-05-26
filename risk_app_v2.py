@@ -3,7 +3,7 @@ import yfinance as yf
 import numpy as np
 
 st.set_page_config(page_title="Portfolio Risk Analyzer", layout="centered")
-st.title("Portfolio Risk Analyzer")
+st.title("High-Sensitivity Portfolio Risk Analyzer")
 
 st.markdown("This tool analyzes the risk of your portfolio based on individual stock risk and weighted exposure.")
 
@@ -19,7 +19,7 @@ def add_row():
 def remove_row(index):
     st.session_state.tickers.pop(index)
 
-st.markdown("### Enter Your Portfolio")
+st.markdown("### 📌 Enter Your Portfolio")
 st.button("➕ Add Stock", on_click=add_row)
 
 portfolio = []
@@ -29,11 +29,11 @@ for i, entry in enumerate(st.session_state.tickers):
     cols = st.columns([2, 1, 0.5])
     name = cols[0].text_input(f"Stock Name {i+1}", value=entry["name"], key=f"name_{i}", placeholder="e.g., AAPL")
     amount = cols[1].number_input("Amount", min_value=0.0, step=100.0, value=entry["amount"], key=f"amount_{i}")
-    remove = cols[2].button("X", key=f"remove_{i}")
+    remove = cols[2].button("❌", key=f"remove_{i}")
     
     if remove:
         remove_row(i)
-        st.experimental_rerun()
+        st.rerun()
     else:
         st.session_state.tickers[i]["name"] = name
         st.session_state.tickers[i]["amount"] = amount
@@ -119,9 +119,9 @@ def score_beta(beta):
 
 # ----------------- Portfolio Risk Calculation -----------------
 
-if st.button("Analyze Portfolio Risk") and portfolio and total_investment > 0:
+if st.button("📊 Analyze Portfolio Risk") and portfolio and total_investment > 0:
     st.markdown("---")
-    st.markdown("## Portfolio Risk Results")
+    st.markdown("## 🧮 Portfolio Risk Results")
     risk_contributions = []
     weighted_risks = []
 
@@ -180,7 +180,7 @@ if st.button("Analyze Portfolio Risk") and portfolio and total_investment > 0:
         else:
             st.error("Risk Level: Very High")
 
-        st.markdown("### Stock Contributions")
+        st.markdown("### 📌 Stock Contributions")
         for t, r, w in risk_contributions:
             st.write(f"**{t}** — Risk: {round(r,1)}% | Weight: {w}%")
     else:
