@@ -2,50 +2,85 @@ import streamlit as st
 import yfinance as yf
 import numpy as np
 
-st.set_page_config(page_title="Risk Analyzer", layout="centered")
-st.title("Investment Risk Analyzer")
+st.set_page_config(page_title="Portfolio Risk Analyzer", layout="centered")
+st.title("Portfolio Risk Analyzer")
 
-st.subheader("Enter stock information")
-ticker = st.text_input("Stock Ticker (e.g., AAPL, MSFT, TSLA)", value="AAPL")
-investment = st.number_input("Investment Amount (USD)", min_value=100.0, step=100.0)
+st.markdown("This tool analyzes the risk of your portfolio based on individual stock risk and weighted exposure.")
 
-# Risk category weights
-category_weights = {
-    "market": 0.4,
-    "financial": 0.3,
-    "valuation": 0.3
-}
+st.markdown("### Enter Your Portfolio")
 
-# Sector risk mapping
-sector_risk_map = {
-    "Technology": 60, "Energy": 80, "Healthcare": 40, "Financial Services": 55,
-    "Industrials": 65, "Consumer Defensive": 35, "Utilities": 30,
-    "Communication Services": 50, "Consumer Cyclical": 70,
-    "Basic Materials": 60, "Real Estate": 70, "Unknown": 50
-}
+if "tickers" not in st.session_state:
+    st.session_state.tickers = [""]
 
-# Scoring functions
-def score_volatility(std):
-    return min(std * 1000, 100)
+def add_row():
+    st.session_state.tickers.append("")
 
-def score_drawdown(mdd):
-    return min(abs(mdd) * 100, 100)
+st.button("➕ Add Stock", on_click=add_row)
 
-def score_beta(beta):
-    return 50 if beta is None else min(abs(beta) * 50, 100)
+portfolio = []
+total_investment = 0
 
-def score_sector(sector):
-    return sector_risk_map.get(sector, 50)
+for i, ticker in enumerate(st.session_state.tickers):
+    cols = st.columns([2, 1])
+    stock = cols[0].text_input(f"Ticker {i+1}", value=st.session_state.tickers[i], key=f"ticker_{i}")
+    amount = cols[1].number_input(f"Amount ${i+1}", min_value=0.0, step=100.0, key=f"amount_{i}")
+    if stock:
+        portfolio.append((stock.upper(), amount))
+        total_investment += amount
+
+# ----------------- Risk Scoring Functions -----------------
+
+def score_pe(pe):
+    if pe is None or pe <= 0:
+        return 100
+    elif pe > 60:
+        return 100
+    elif pe > 40:
+        return 85
+    elif pe > 25:
+        return 65
+    elif pe > 10:
+        return 50
+    else:
+        return 30
+
+def score_ps(ps):
+    if ps is None or ps <= 0:
+        return 90
+    elif ps > 15:
+        return 100
+    elif ps > 10:
+        return 85
+    elif ps > 6:
+        return 65
+    elif ps > 2:
+        return 50
+    else:
+        return 30
+
+def score_div_yield(dy):
+    if dy is None or dy <= 0:
+        return 80
+    elif dy >= 0.05:
+        return 30
+    elif dy >= 0.03:
+        return 50
+    else:
+        return 65
 
 def score_debt_to_equity(dte):
     if dte is None or dte <= 0:
-        return 80
-    elif dte < 50:
-        return 30
-    elif dte <= 200:
-        return 60
+        return 85
+    elif dte > 300:
+        return 100
+    elif dte > 200:
+        return 85
+    elif dte > 100:
+        return 65
+    elif dte > 50:
+        return 50
     else:
-        return 90
+        return 30
 
 def score_operating_margin(margin):
     if margin is None:
@@ -55,111 +90,84 @@ def score_operating_margin(margin):
     elif margin > 0.1:
         return 50
     else:
-        return 80
-
-def score_div_yield(dy):
-    if dy is None or dy <= 0:
         return 75
-    elif dy >= 0.05:
-        return 30
-    elif dy >= 0.03:
+
+def score_volatility(std):
+    return min(std * 1500, 100)
+
+def score_drawdown(mdd):
+    return min(abs(mdd) * 130, 100)
+
+def score_beta(beta):
+    if beta is None:
         return 50
-    else:
-        return 65
+    return min(abs(beta) * 60, 100)
 
-def score_ps(ps):
-    if ps is None or ps <= 0:
-        return 80
-    elif ps < 2:
-        return 30
-    elif ps <= 6:
-        return 50
-    elif ps <= 10:
-        return 70
-    else:
-        return 90
+# ----------------- Portfolio Risk Calculation -----------------
 
-def score_pe(pe):
-    if pe is None or pe <= 0:
-        return 90
-    elif pe < 10:
-        return 40
-    elif pe <= 25:
-        return 60
-    elif pe <= 40:
-        return 75
-    else:
-        return 90
+if st.button("Analyze Portfolio Risk") and portfolio and total_investment > 0:
+    st.markdown("---")
+    st.markdown("## Portfolio Risk Results")
+    risk_contributions = []
+    weighted_risks = []
 
-# Main logic
-if st.button("Analyze Risk") and ticker:
-    try:
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period="1y")
-
-        if hist.empty:
-            st.error("Failed to load historical price data.")
-        else:
+    for ticker, amount in portfolio:
+        try:
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period="1y")
             info = stock.info
+
+            if hist.empty:
+                st.warning(f"No data for {ticker}")
+                continue
+
             close = hist["Close"]
             returns = close.pct_change().dropna()
 
-            # MARKET RISK
-            volatility_score = score_volatility(np.std(returns))
-            drawdown_score = score_drawdown((close / close.cummax() - 1).min())
-            beta_score = score_beta(info.get("beta"))
-            sector_score = score_sector(info.get("sector", "Unknown"))
+            pe = score_pe(info.get("forwardPE"))
+            ps = score_ps(info.get("priceToSalesTrailing12Months"))
+            dy = score_div_yield(info.get("dividendYield"))
+            dte = score_debt_to_equity(info.get("debtToEquity"))
+            margin = score_operating_margin(info.get("operatingMargins"))
+            vol = score_volatility(np.std(returns))
+            dd = score_drawdown((close / close.cummax() - 1).min())
+            beta = score_beta(info.get("beta"))
 
-            market_risk = np.mean([volatility_score, drawdown_score, beta_score, sector_score])
+            # Base risk
+            risk = np.mean([pe, ps, dy, dte, margin, vol, dd, beta])
 
-            # FINANCIAL RISK
-            dte_score = score_debt_to_equity(info.get("debtToEquity"))
-            margin_score = score_operating_margin(info.get("operatingMargins"))
-            dividend_score = score_div_yield(info.get("dividendYield"))
+            # Conditional multiplier: risky combo booster
+            if ps > 10 and info.get("operatingMargins", 1) < 0.05:
+                risk *= 1.2
+            if pe > 50 and dte > 250:
+                risk *= 1.15
 
-            financial_risk = np.mean([dte_score, margin_score, dividend_score])
+            risk = min(risk, 100)
 
-            # VALUATION RISK
-            ps_score = score_ps(info.get("priceToSalesTrailing12Months"))
-            pe_score = score_pe(info.get("forwardPE"))
+            weight = amount / total_investment
+            weighted_risks.append(risk * weight)
+            risk_contributions.append((ticker, risk, round(weight * 100, 1)))
 
-            valuation_risk = np.mean([ps_score, pe_score])
+        except Exception as e:
+            st.error(f"{ticker}: Failed to analyze. {e}")
 
-            # Weighted total risk
-            overall_risk = (
-                category_weights["market"] * market_risk +
-                category_weights["financial"] * financial_risk +
-                category_weights["valuation"] * valuation_risk
-            )
+    if weighted_risks:
+        total_risk = sum(weighted_risks)
+        st.subheader(f"🔎 Total Portfolio Risk: {round(total_risk, 1)}%")
 
-            # Display result
-            st.subheader(f"Total Risk Score: {round(overall_risk, 1)}%")
-            if overall_risk <= 20:
-                st.success("Risk Level: Very Low")
-            elif overall_risk <= 40:
-                st.success("Risk Level: Low")
-            elif overall_risk <= 60:
-                st.warning("Risk Level: Moderate")
-            elif overall_risk <= 80:
-                st.warning("Risk Level: High")
-            else:
-                st.error("Risk Level: Very High")
+        if total_risk <= 20:
+            st.success("Risk Level: Very Low")
+        elif total_risk <= 40:
+            st.success("Risk Level: Low")
+        elif total_risk <= 60:
+            st.warning("Risk Level: Moderate")
+        elif total_risk <= 80:
+            st.warning("Risk Level: High")
+        else:
+            st.error("Risk Level: Very High")
 
-            st.markdown("### Risk Breakdown")
-            st.write(f"Market Risk: {round(market_risk)}%")
-            st.write(f"Financial Risk: {round(financial_risk)}%")
-            st.write(f"Valuation Risk: {round(valuation_risk)}%")
-
-            st.markdown("### Indicator Scores")
-            st.write(f"Volatility: {round(volatility_score)}")
-            st.write(f"Max Drawdown: {round(drawdown_score)}")
-            st.write(f"Beta: {round(beta_score)}")
-            st.write(f"Sector: {round(sector_score)}")
-            st.write(f"Debt to Equity: {round(dte_score)}")
-            st.write(f"Operating Margin: {round(margin_score)}")
-            st.write(f"Dividend Yield: {round(dividend_score)}")
-            st.write(f"P/S Ratio: {round(ps_score)}")
-            st.write(f"Forward P/E: {round(pe_score)}")
-
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
+        st.markdown("### 📌 Stock Contributions")
+        for t, r, w in risk_contributions:
+            st.write(f"**{t}** — Risk: {round(r,1)}% | Weight: {w}%")
+    else:
+        st.warning("No valid stock data to calculate portfolio risk.")
