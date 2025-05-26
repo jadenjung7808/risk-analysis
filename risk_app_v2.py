@@ -3,10 +3,8 @@ import yfinance as yf
 import numpy as np
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="Risk Analyzer", layout="centered")
-st.title("Investment Risk Analyzer")
-
-st.markdown("Enter stock tickers and investment amounts to assess risk.")
+st.set_page_config(page_title="Portfolio Risk Analyzer", layout="centered")
+st.title("📊 Portfolio Investment Risk Analyzer")
 
 if "tickers" not in st.session_state:
     st.session_state.tickers = [{"name": "", "amount": ""}]
@@ -104,21 +102,33 @@ def calculate_components(ticker, period="1y"):
     except:
         return None, {}
 
-if st.button("Analyze Risk") and portfolio:
+if st.button("📊 Analyze Portfolio Risk") and portfolio:
     st.markdown("---")
+    risks = []
+    total_amount = sum([amt for _, amt in portfolio])
+    
     for ticker, amt in portfolio:
-        st.subheader(f"📌 {ticker} ({selected_period})")
+        r, _ = calculate_components(ticker, selected_period)
+        if r is not None:
+            risks.append((r, amt))
+    
+    if risks:
+        portfolio_risk = round(sum(r * a for r, a in risks) / total_amount, 2)
+        label = interpret_risk(portfolio_risk)
+        bg_color = risk_color(portfolio_risk)
+        st.markdown(f"""
+            <div style="background-color:{bg_color}; padding:20px; border-radius:10px">
+            <h2>📌 Total Portfolio Risk: {portfolio_risk}%</h2>
+            <p><b>Risk Level:</b> {label}</p>
+            </div>
+        """, unsafe_allow_html=True)
+        st.markdown("🔍 This percentage represents the overall investment risk level of your portfolio, based on financial ratios and market volatility of the selected stocks. Higher values indicate greater potential instability and loss exposure.")
+
+    for ticker, amt in portfolio:
+        st.subheader(f"📍 {ticker} ({selected_period})")
         risk, scores = calculate_components(ticker, selected_period)
         if risk is not None:
-            bg_color = risk_color(risk)
             label = interpret_risk(risk)
-            st.markdown(f"""
-                <div style="background-color:{bg_color}; padding:20px; border-radius:10px">
-                <h3>Total Risk: {risk}%</h3>
-                <p><b>Level:</b> {label}</p>
-                </div>
-            """, unsafe_allow_html=True)
-
             top_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:3]
             labels = [x[0] for x in top_scores]
             values = [x[1] for x in top_scores]
@@ -130,17 +140,14 @@ if st.button("Analyze Risk") and portfolio:
                 yval = bar.get_height()
                 ax.text(bar.get_x() + bar.get_width()/2.0, yval, f'{yval:.1f}%', va='bottom', ha='center')
             ax.set_ylabel("Risk Contribution (%)")
-            ax.set_title("Top 3 Risk Drivers")
+            ax.set_title(f"{ticker} - Top 3 Risk Drivers")
             st.pyplot(fig)
 
-with st.expander("ℹ️ Risk Indicators Explained"):
+with st.expander("ℹ️ What Does Risk % Mean?"):
     st.markdown("""
-    - **PE (Price-to-Earnings Ratio)**: Higher PE → higher valuation risk.
-    - **PS (Price-to-Sales Ratio)**: High PS = expensive relative to sales.
-    - **D/E (Debt-to-Equity)**: High leverage → potential instability.
-    - **Margin**: Lower operating margin → less efficiency.
-    - **Dividend**: No dividend = higher growth dependency.
-    - **Volatility**: Large price swings = unstable returns.
-    - **Drawdown**: Max historical loss from peak.
-    - **Beta**: Sensitivity to market movement.
-    """)
+    - **This percentage shows how risky a stock or portfolio is, combining valuation, leverage, profitability, volatility, and market reaction.**
+    - **0–20%**: Extremely stable, low-risk investment<br>
+    - **20–45%**: Generally safe with some risk factors<br>
+    - **45–67%**: Moderate to high volatility and valuation concerns<br>
+    - **67–100%**: Speculative, unstable, or financially weak stocks
+    """, unsafe_allow_html=True)
