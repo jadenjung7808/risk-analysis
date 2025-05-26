@@ -5,42 +5,35 @@ import numpy as np
 st.set_page_config(page_title="Portfolio Risk Analyzer", layout="centered")
 st.title("Portfolio Risk Analyzer")
 
-st.markdown("This tool analyzes the risk of your portfolio based on individual stock risk and weighted exposure.")
+st.markdown("This tool analyzes the risk of your portfolio based on 10 financial and volatility indicators using a weighted model.")
 
-# Initialize tickers
-if "tickers" not in st.session_state:
-    st.session_state.tickers = [{"name": "", "amount": 0.0}]
+# Risk % explanation
+with st.expander("❓ What does the risk % mean?"):
+    st.markdown("""
+    - **0–20%**: Extremely Low Risk  
+    - **20–33%**: Very Low Risk  
+    - **33–45%**: Low Risk  
+    - **45–55%**: Moderate Risk  
+    - **55–67%**: High Risk  
+    - **67–80%**: Very High Risk  
+    - **80–100%**: Extremely High Risk  
+    """)
 
-def add_row():
-    st.session_state.tickers.append({"name": "", "amount": 0.0})
-
-def remove_row(index):
-    st.session_state.tickers.pop(index)
-
-st.markdown("### Enter Your Portfolio")
-st.button("➕ Add Stock", on_click=add_row)
-
+# Fixed input table
+st.markdown("### 📌 Enter Up to 5 Stocks")
 portfolio = []
 total_investment = 0
 
-for i, entry in enumerate(st.session_state.tickers):
-    cols = st.columns([2, 1, 0.5])
-    name = cols[0].text_input(f"Stock Name {i+1}", value=entry["name"], key=f"name_{i}", placeholder="e.g., AAPL")
-    amount = cols[1].number_input("Amount ($)", min_value=0.0, step=100.0, value=entry["amount"], key=f"amount_{i}")
-    remove = cols[2].button("❌", key=f"remove_{i}")
+for i in range(5):
+    cols = st.columns([2, 1])
+    name = cols[0].text_input(f"Stock Name {i+1}", key=f"name_{i}", placeholder="e.g., AAPL")
+    amount = cols[1].number_input("Amount ($)", min_value=0.0, step=100.0, key=f"amount_{i}")
     
-    if remove:
-        remove_row(i)
-        st.rerun()
-    else:
-        st.session_state.tickers[i]["name"] = name
-        st.session_state.tickers[i]["amount"] = amount
-
     if name:
         portfolio.append((name.upper(), amount))
         total_investment += amount
 
-# ----------------- Risk Scoring Functions -----------------
+# ----------------- Scoring Functions -----------------
 
 def score_pe(pe):
     if pe is None or pe <= 0:
@@ -115,9 +108,44 @@ def score_beta(beta):
         return 50
     return min(abs(beta) * 60, 100)
 
-# ----------------- Portfolio Risk Calculation -----------------
+# ----------------- Risk Calculation -----------------
 
-if st.button("Analyze Risk") and portfolio and total_investment > 0:
+def weighted_score(pe, ps, dy, dte, margin, vol, dd, beta):
+    weights = {
+        "pe": 0.18, "ps": 0.12,
+        "dte": 0.12, "margin": 0.12, "div": 0.06,
+        "vol": 0.16, "dd": 0.12, "beta": 0.12
+    }
+    return (
+        score_pe(pe) * weights["pe"] +
+        score_ps(ps) * weights["ps"] +
+        score_div_yield(dy) * weights["div"] +
+        score_debt_to_equity(dte) * weights["dte"] +
+        score_operating_margin(margin) * weights["margin"] +
+        score_volatility(vol) * weights["vol"] +
+        score_drawdown(dd) * weights["dd"] +
+        score_beta(beta) * weights["beta"]
+    )
+
+def interpret_risk(score):
+    if score <= 20:
+        return "Extremely Low Risk"
+    elif score <= 33:
+        return "Very Low Risk"
+    elif score <= 45:
+        return "Low Risk"
+    elif score <= 55:
+        return "Moderate Risk"
+    elif score <= 67:
+        return "High Risk"
+    elif score <= 80:
+        return "Very High Risk"
+    else:
+        return "Extremely High Risk"
+
+# ----------------- Portfolio Analysis -----------------
+
+if st.button("Analyze Portfolio Risk") and portfolio and total_investment > 0:
     st.markdown("---")
     st.markdown("## Portfolio Risk Results")
     risk_contributions = []
@@ -136,20 +164,20 @@ if st.button("Analyze Risk") and portfolio and total_investment > 0:
             close = hist["Close"]
             returns = close.pct_change().dropna()
 
-            pe = score_pe(info.get("forwardPE"))
-            ps = score_ps(info.get("priceToSalesTrailing12Months"))
-            dy = score_div_yield(info.get("dividendYield"))
-            dte = score_debt_to_equity(info.get("debtToEquity"))
-            margin = score_operating_margin(info.get("operatingMargins"))
-            vol = score_volatility(np.std(returns))
-            dd = score_drawdown((close / close.cummax() - 1).min())
-            beta = score_beta(info.get("beta"))
+            pe = info.get("forwardPE")
+            ps = info.get("priceToSalesTrailing12Months")
+            dy = info.get("dividendYield")
+            dte = info.get("debtToEquity")
+            margin = info.get("operatingMargins")
+            vol = np.std(returns)
+            dd = (close / close.cummax() - 1).min()
+            beta = info.get("beta")
 
-            risk = np.mean([pe, ps, dy, dte, margin, vol, dd, beta])
+            risk = weighted_score(pe, ps, dy, dte, margin, vol, dd, beta)
 
-            if ps > 10 and info.get("operatingMargins", 1) < 0.05:
+            if ps and ps > 10 and (margin or 0) < 0.05:
                 risk *= 1.2
-            if pe > 50 and dte > 250:
+            if pe and pe > 50 and dte and dte > 250:
                 risk *= 1.15
 
             risk = min(risk, 100)
@@ -163,18 +191,7 @@ if st.button("Analyze Risk") and portfolio and total_investment > 0:
 
     if weighted_risks:
         total_risk = sum(weighted_risks)
-        st.subheader(f"Total Portfolio Risk: {round(total_risk, 1)}%")
-
-        if total_risk <= 20:
-            st.success("Risk Level: Very Low")
-        elif total_risk <= 40:
-            st.success("Risk Level: Low")
-        elif total_risk <= 60:
-            st.warning("Risk Level: Moderate")
-        elif total_risk <= 80:
-            st.warning("Risk Level: High")
-        else:
-            st.error("Risk Level: Very High")
+        st.subheader(f"🔎 Total Portfolio Risk: {round(total_risk, 1)}% — {interpret_risk(total_risk)}")
 
         st.markdown("### Stock Contributions")
         for t, r, w in risk_contributions:
