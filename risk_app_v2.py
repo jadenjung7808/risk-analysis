@@ -3,29 +3,43 @@ import yfinance as yf
 import numpy as np
 
 st.set_page_config(page_title="Portfolio Risk Analyzer", layout="centered")
-st.title("Portfolio Risk Analyzer")
+st.title("High-Sensitivity Portfolio Risk Analyzer")
 
 st.markdown("This tool analyzes the risk of your portfolio based on individual stock risk and weighted exposure.")
 
-st.markdown("### Enter Your Portfolio")
-
+# Initialize tickers
 if "tickers" not in st.session_state:
-    st.session_state.tickers = [""]
+    st.session_state.tickers = [{"name": "", "amount": 0.0}]
 
+# Add a new stock row
 def add_row():
-    st.session_state.tickers.append("")
+    st.session_state.tickers.append({"name": "", "amount": 0.0})
 
+# Remove a specific row
+def remove_row(index):
+    st.session_state.tickers.pop(index)
+
+st.markdown("### Enter Your Portfolio")
 st.button("➕ Add Stock", on_click=add_row)
 
 portfolio = []
 total_investment = 0
 
-for i, ticker in enumerate(st.session_state.tickers):
-    cols = st.columns([2, 1])
-    stock = cols[0].text_input(f"Ticker {i+1}", value=st.session_state.tickers[i], key=f"ticker_{i}")
-    amount = cols[1].number_input(f"Amount ${i+1}", min_value=0.0, step=100.0, key=f"amount_{i}")
-    if stock:
-        portfolio.append((stock.upper(), amount))
+for i, entry in enumerate(st.session_state.tickers):
+    cols = st.columns([2, 1, 0.5])
+    name = cols[0].text_input(f"Stock Name {i+1}", value=entry["name"], key=f"name_{i}", placeholder="e.g., AAPL")
+    amount = cols[1].number_input("Amount", min_value=0.0, step=100.0, value=entry["amount"], key=f"amount_{i}")
+    remove = cols[2].button("❌", key=f"remove_{i}")
+    
+    if remove:
+        remove_row(i)
+        st.experimental_rerun()
+    else:
+        st.session_state.tickers[i]["name"] = name
+        st.session_state.tickers[i]["amount"] = amount
+
+    if name:
+        portfolio.append((name.upper(), amount))
         total_investment += amount
 
 # ----------------- Risk Scoring Functions -----------------
@@ -166,7 +180,7 @@ if st.button("Analyze Portfolio Risk") and portfolio and total_investment > 0:
         else:
             st.error("Risk Level: Very High")
 
-        st.markdown("### 📌 Stock Contributions")
+        st.markdown("### Stock Contributions")
         for t, r, w in risk_contributions:
             st.write(f"**{t}** — Risk: {round(r,1)}% | Weight: {w}%")
     else:
