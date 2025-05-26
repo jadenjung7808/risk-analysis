@@ -112,8 +112,8 @@ if st.button("Analyze Risk") and portfolio and total_investment > 0:
 
     if weighted_risks:
         total_risk = sum(weighted_risks)
-        st.subheader(f"🔎 Total Risk: {round(total_risk,1)}% — {interpret_risk(total_risk)}")
-        st.markdown("### 📌 Contributions:")
+        st.subheader(f"Total Risk: {round(total_risk,1)}% — {interpret_risk(total_risk)}")
+        st.markdown("### Contributions:")
         for t, r, w in risk_contributions:
             st.write(f"**{t}** — Risk: {round(r,1)}% | Weight: {w}%")
     else:
