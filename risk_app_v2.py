@@ -11,11 +11,9 @@ st.markdown("This tool analyzes the risk of your portfolio based on individual s
 if "tickers" not in st.session_state:
     st.session_state.tickers = [{"name": "", "amount": 0.0}]
 
-# Add a new stock row
 def add_row():
     st.session_state.tickers.append({"name": "", "amount": 0.0})
 
-# Remove a specific row
 def remove_row(index):
     st.session_state.tickers.pop(index)
 
@@ -28,7 +26,7 @@ total_investment = 0
 for i, entry in enumerate(st.session_state.tickers):
     cols = st.columns([2, 1, 0.5])
     name = cols[0].text_input(f"Stock Name {i+1}", value=entry["name"], key=f"name_{i}", placeholder="e.g., AAPL")
-    amount = cols[1].number_input("Amount", min_value=0.0, step=100.0, value=entry["amount"], key=f"amount_{i}")
+    amount = cols[1].number_input("Amount ($)", min_value=0.0, step=100.0, value=entry["amount"], key=f"amount_{i}")
     remove = cols[2].button("❌", key=f"remove_{i}")
     
     if remove:
@@ -147,10 +145,8 @@ if st.button("Analyze Risk") and portfolio and total_investment > 0:
             dd = score_drawdown((close / close.cummax() - 1).min())
             beta = score_beta(info.get("beta"))
 
-            # Base risk
             risk = np.mean([pe, ps, dy, dte, margin, vol, dd, beta])
 
-            # Conditional multiplier: risky combo booster
             if ps > 10 and info.get("operatingMargins", 1) < 0.05:
                 risk *= 1.2
             if pe > 50 and dte > 250:
@@ -167,7 +163,7 @@ if st.button("Analyze Risk") and portfolio and total_investment > 0:
 
     if weighted_risks:
         total_risk = sum(weighted_risks)
-        st.subheader(f"🔎 Total Portfolio Risk: {round(total_risk, 1)}%")
+        st.subheader(f"Total Portfolio Risk: {round(total_risk, 1)}%")
 
         if total_risk <= 20:
             st.success("Risk Level: Very Low")
