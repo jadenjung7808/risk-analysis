@@ -69,6 +69,7 @@ def calculate_components(ticker, period="1y"):
             return None, {}
 
         close = hist["Close"]
+        volume = hist["Volume"].mean()
         returns = close.pct_change().dropna()
         spy_returns = spy["Close"].pct_change().dropna()
 
@@ -77,13 +78,17 @@ def calculate_components(ticker, period="1y"):
         dy = stock.info.get("dividendYield")
         dte = stock.info.get("debtToEquity") or 300
         margin = stock.info.get("operatingMargins") or 0.2
+        avg_volume = volume or 1000000
 
         vol = volatility(returns)
         dd = drawdown(close)
         beta = beta_calc(returns, spy_returns)
 
-        weights = {"PE": 0.18, "PS": 0.12, "D/E": 0.12, "Margin": 0.12,
-                   "Dividend": 0.06, "Volatility": 0.16, "Drawdown": 0.12, "Beta": 0.12}
+        weights = {
+            "PE": 0.16, "PS": 0.12, "D/E": 0.12, "Margin": 0.12,
+            "Dividend": 0.06, "Volatility": 0.18, "Drawdown": 0.14,
+            "Beta": 0.1, "Liquidity": 0.1
+        }
 
         def score(x, scale): return min(x / scale, 1) * 100
         scores = {
@@ -95,6 +100,7 @@ def calculate_components(ticker, period="1y"):
             "Volatility": score(vol, 0.05) * weights["Volatility"],
             "Drawdown": score(abs(dd), 0.3) * weights["Drawdown"],
             "Beta": score(beta or 1, 2) * weights["Beta"],
+            "Liquidity": score(1000000 / avg_volume, 1) * weights["Liquidity"],
         }
 
         total_risk = round(sum(scores.values()), 2)
@@ -118,19 +124,19 @@ if st.button("📊 Analyze Risk") and portfolio:
         bg_color = risk_color(portfolio_risk)
         st.markdown(f"""
             <div style="background-color:{bg_color}; padding:20px; border-radius:10px">
-            <h2>Total Portfolio Risk: {portfolio_risk}%</h2>
+            <h2> Total Portfolio Risk: {portfolio_risk}%</h2>
             <p><b>Risk Level:</b> {label}</p>
             </div>
         """, unsafe_allow_html=True)
 
-        st.markdown(" This percentage quantifies your portfolio’s total risk level based on valuation, debt, volatility, and market sensitivity.")
+        st.markdown("🔍 This percentage quantifies your portfolio’s total risk level based on valuation, debt, volatility, and market sensitivity.")
 
     for ticker, risk, amt in risks:
         st.subheader(f" {ticker} ({selected_period})")
         _, scores = calculate_components(ticker, selected_period)
         label = interpret_risk(risk)
         contribution = (risk * amt / total_amount)
-        st.markdown(f" Contribution to Portfolio Risk: **{contribution:.1f}%**")
+        st.markdown(f"Contribution to Portfolio Risk: **{contribution:.1f}%**")
 
         top_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:3]
         labels = [x[0] for x in top_scores]
@@ -146,7 +152,7 @@ if st.button("📊 Analyze Risk") and portfolio:
         ax.set_title(f"{ticker} - Top 3 Risk Drivers")
         st.pyplot(fig)
 
-with st.expander("❓Risk %?"):
+with st.expander("📘 Risk %?"):
     st.markdown("""
     - **0–20%: Extremely Low Risk** — Very stable companies with strong financials and low volatility  
     - **20–33%: Very Low Risk** — Reliable firms with low debt and steady returns  
@@ -157,7 +163,7 @@ with st.expander("❓Risk %?"):
     - **80–100%: Extremely High Risk** — Structurally weak, highly volatile, or hype-driven
     """)
 
-with st.expander("❓Risk Indicators"):
+with st.expander("📘 Risk Indicators"):
     st.markdown("""
     - **PE (Price-to-Earnings Ratio)**: High PE means potentially overvalued → **Higher = Higher Risk**  
     - **PS (Price-to-Sales Ratio)**: High PS suggests high price vs revenue → **Higher = Higher Risk**  
@@ -166,5 +172,6 @@ with st.expander("❓Risk Indicators"):
     - **Dividend Yield**: No dividends = uncertain returns → **Lower = Higher Risk**  
     - **Volatility**: Fluctuating price → **Higher = Higher Risk**  
     - **Drawdown**: Large past losses → **Larger = Higher Risk**  
-    - **Beta**: Sensitivity to market → **Higher = Higher Risk**
+    - **Beta**: Sensitivity to market → **Higher = Higher Risk**  
+    - **Liquidity (Avg Volume)**: Thinly traded → **Lower volume = Higher Risk**
     """)
