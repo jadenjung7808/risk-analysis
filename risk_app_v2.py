@@ -120,7 +120,7 @@ if st.button("Analyze Risk") and portfolio and total_investment > 0:
         st.warning("No valid stock data to calculate risk.")
 
 # Risk % Explanation
-with st.expander("risk % mean?"):
+with st.expander("risk % ?"):
     st.markdown("""
 **What does the risk % mean?**  
 The risk percentage reflects the level of financial and market risk:
