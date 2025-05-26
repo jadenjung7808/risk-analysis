@@ -3,7 +3,7 @@ import yfinance as yf
 import numpy as np
 
 st.set_page_config(page_title="Portfolio Risk Analyzer", layout="centered")
-st.title("Portfolio Risk Analyzer")
+st.title("High-Sensitivity Portfolio Risk Analyzer")
 
 st.markdown("Enter stocks and investment amounts to analyze portfolio risk based on financial and volatility indicators.")
 
@@ -72,9 +72,9 @@ def interpret_risk(score):
     elif score <= 80: return "Very High Risk"
     else: return "Extremely High Risk"
 
-if st.button("Analyze Risk") and portfolio and total_investment > 0:
+if st.button("📊 Analyze Portfolio Risk") and portfolio and total_investment > 0:
     st.markdown("---")
-    st.subheader("Portfolio Risk Results")
+    st.subheader("🧮 Portfolio Risk Results")
     risk_contributions = []
     weighted_risks = []
 
@@ -112,24 +112,24 @@ if st.button("Analyze Risk") and portfolio and total_investment > 0:
 
     if weighted_risks:
         total_risk = sum(weighted_risks)
-        st.subheader(f"Total Risk: {round(total_risk,1)}% — {interpret_risk(total_risk)}")
-        st.markdown("### Contributions:")
+        st.subheader(f"🔎 Total Risk: {round(total_risk,1)}% — {interpret_risk(total_risk)}")
+        st.markdown("### 📌 Contributions:")
         for t, r, w in risk_contributions:
             st.write(f"**{t}** — Risk: {round(r,1)}% | Weight: {w}%")
     else:
         st.warning("No valid stock data to calculate risk.")
 
-# Risk % Explanation
-with st.expander("risk % ?"):
+# Color-coded and descriptive Risk % explanation
+with st.expander("ⓘ"):
     st.markdown("""
-**What does the risk % mean?**  
-The risk percentage reflects the level of financial and market risk:
-
-- **0–20%**: Extremely Low Risk — peaceful
-- **20–33%**: Very Low Risk — Reliable companies with low volatility 
-- **33–45%**: Low Risk — Generally stable but some risk factors  
-- **45–55%**: Moderate Risk — Balanced profile 
-- **55–67%**: High Risk — Volatile or overvalued stocks  
-- **67–80%**: Very High Risk — Speculative or financially stressed companies  
-- **80–100%**: Extremely High Risk — Loss-making, hype-driven, or structurally weak firms
-""")
+    <div style='font-size:15px'>
+    <b>What does the risk % mean?</b><br><br>
+    <span style='color:#2ecc71'><b>0–20%</b>: Extremely Low Risk</span> — peaceful<br>
+    <span style='color:#27ae60'><b>20–33%</b>: Very Low Risk</span> — Reliable companies with low volatility<br>
+    <span style='color:#f1c40f'><b>33–45%</b>: Low Risk</span> — Generally stable but some risk factors<br>
+    <span style='color:#e67e22'><b>45–55%</b>: Moderate Risk</span> — Balanced profile<br>
+    <span style='color:#e74c3c'><b>55–67%</b>: High Risk</span> — Volatile or overvalued stocks<br>
+    <span style='color:#c0392b'><b>67–80%</b>: Very High Risk</span> — Speculative or financially stressed companies<br>
+    <span style='color:#8e44ad'><b>80–100%</b>: Extremely High Risk</span> — Loss-making, hype-driven, or structurally weak firms
+    </div>
+    """, unsafe_allow_html=True)
