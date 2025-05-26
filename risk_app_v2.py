@@ -3,7 +3,7 @@ import yfinance as yf
 import numpy as np
 
 st.set_page_config(page_title="Risk Analyzer", layout="centered")
-st.title("Advanced Investment Risk Analyzer")
+st.title("Investment Risk Analyzer")
 
 st.subheader("Enter stock information")
 ticker = st.text_input("Stock Ticker (e.g., AAPL, MSFT, TSLA)", value="AAPL")
