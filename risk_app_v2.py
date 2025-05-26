@@ -146,7 +146,7 @@ if st.button("Analyze Risk") and portfolio:
         ax.set_title(f"{ticker} - Top 3 Risk Drivers")
         st.pyplot(fig)
 
-with st.expander(" Risk %?"):
+with st.expander("📘 Risk %?"):
     st.markdown("""
     - **0–20%: Extremely Low Risk** — Very stable companies with strong financials and low volatility  
     - **20–33%: Very Low Risk** — Reliable firms with low debt and steady returns  
