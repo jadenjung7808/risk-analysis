@@ -6,29 +6,14 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Portfolio Risk Analyzer", layout="centered")
 st.title("Portfolio Risk Analyzer")
 
-# 리스크 설명 및 데이터 범위
-with st.expander("ℹ️ How We Calculate Risk & What Data We Use"):
-    st.markdown("""
-    ### How We Calculate the Risk Score
-    Our score is based on 10 normalized and weighted indicators:
+# ✅ 새 가중치 구조
+weights = {
+    "PE": 0.18, "PS": 0.12, "D/E": 0.15, "Margin": 0.15,
+    "Dividend": 0.03, "Volatility": 0.10, "Drawdown": 0.10,
+    "Beta": 0.07, "Liquidity": 0.05, "ESG": 0.05
+}
 
-    - PE Ratio: Higher = more overvalued → Higher Risk  
-    - PS Ratio: Higher = expensive vs. revenue → Higher Risk  
-    - Debt-to-Equity: Higher = more debt → Higher Risk  
-    - Operating Margin: Lower = less profit → Higher Risk  
-    - Dividend Yield: Low or none → Higher Risk  
-    - Volatility: Higher = unstable → Higher Risk  
-    - Drawdown: Larger = vulnerable to loss → Higher Risk  
-    - Beta: Higher = more sensitive to market → Higher Risk  
-    - Liquidity: Lower volume = harder to exit → Higher Risk  
-    - ESG Score: Higher = more sustainability concerns → Higher Risk
-
-    ### 📘 Data Limitations
-    - ✅ Yahoo Finance data, incl. ESG (if available)  
-    - ❌ No news/controversy/employee review data
-    """)
-
-# Top 3 설명용 딕셔너리
+# ✅ 설명 텍스트
 indicator_explanations = {
     "PE": "A high PE ratio may indicate the stock is overvalued relative to earnings.",
     "PS": "A high PS ratio suggests the stock is expensive compared to its revenue.",
@@ -41,6 +26,19 @@ indicator_explanations = {
     "Liquidity": "Low trading volume can cause difficulty in buying or selling.",
     "ESG": "High ESG score signals environmental, social, or governance concerns."
 }
+
+# 설명 버튼
+with st.expander("ℹ️ How We Calculate Risk & What Data We Use"):
+    st.markdown("""
+    ### 🔢 Risk Score Calculation (New Weights Applied)
+    - More emphasis on **structural risk** (PE, PS, D/E, Margin)
+    - Lower weight on ESG, Beta, and Dividend
+
+    ### 📘 Data Sources
+    - Financial data from Yahoo Finance
+    - ESG score (if available)
+    - No controversy or qualitative data included
+    """)
 
 # 종목 입력
 if "tickers" not in st.session_state:
@@ -68,10 +66,8 @@ for i, entry in enumerate(st.session_state.tickers):
     if name and amount.replace(".", "", 1).isdigit():
         portfolio.append((name.upper(), float(amount)))
 
-# 투자 기간
 selected_period = st.selectbox("Select Investment Period", ["1mo", "3mo", "6mo", "1y", "2y"], index=2)
 
-# 리스크 해석
 def interpret_risk(score):
     if score is None: return "N/A"
     elif score <= 20: return "Extremely Low Risk"
@@ -92,7 +88,6 @@ def risk_color(score):
     elif score <= 80: return "rgba(231, 76, 60, 0.25)"
     else: return "rgba(0, 0, 0, 0.25)"
 
-# 리스크 계산
 def calculate_components(ticker, period="1y"):
     try:
         stock = yf.Ticker(ticker)
@@ -112,12 +107,6 @@ def calculate_components(ticker, period="1y"):
         margin = stock.info.get("operatingMargins") or 0.2
         avg_volume = volume or 1000000
         esg = stock.info.get("esgScores", {}).get("totalEsg", 50)
-
-        weights = {
-            "PE": 0.14, "PS": 0.10, "D/E": 0.10, "Margin": 0.10,
-            "Dividend": 0.05, "Volatility": 0.16, "Drawdown": 0.12,
-            "Beta": 0.09, "Liquidity": 0.09, "ESG": 0.05
-        }
 
         def normalize(x, scale): return min(x / scale, 1) * 100
 
@@ -141,7 +130,6 @@ def calculate_components(ticker, period="1y"):
     except:
         return None, {}, {}
 
-# 분석 시작
 if st.button("📊 Analyze Risk"):
     if not portfolio:
         st.warning("⚠️ Please enter at least one valid stock and amount.")
@@ -165,7 +153,7 @@ if st.button("📊 Analyze Risk"):
             """, unsafe_allow_html=True)
 
         for ticker, risk, amt in risks:
-            st.subheader(f"📍 {ticker} ({selected_period})")
+            st.subheader(f" {ticker} ({selected_period})")
             _, weighted_scores, raw_scores = calculate_components(ticker, selected_period)
             contribution = (risk * amt / total_amount)
             st.markdown(f" Contribution to Portfolio Risk: **{contribution:.1f}%**")
@@ -194,10 +182,10 @@ if st.button("📊 Analyze Risk"):
                 ax.fill(angles, radar_values, alpha=0.25)
                 ax.set_xticks(angles[:-1])
                 ax.set_xticklabels(radar_labels)
-                ax.set_title("Risk Profile (Raw Score)", size=11)
+                ax.set_title("Risk Profile (Raw Score out of 100)", size=11)
                 st.pyplot(fig)
 
-            # Top 3 설명 및 뉴스 링크
+            # ✅ 설명 및 뉴스 링크
             st.markdown("### Explanation of Top Risk Factors")
             for factor in labels:
                 desc = indicator_explanations.get(factor, "No explanation available.")
@@ -205,13 +193,13 @@ if st.button("📊 Analyze Risk"):
                 st.markdown(f"**{factor}**: {desc}  \n🔗 [Search News]({link})", unsafe_allow_html=True)
 
 # 리스크 퍼센트 의미 설명
-with st.expander("ℹ️ Risk % ?"):
+with st.expander("Risk % ?"):
     st.markdown("""
-    - **0–20%**: Extremely Low Risk: strong financials, very low volatility. Ideal for capital preservation.  
-    - **20–33%**: Very Low Risk: Reliable companies with stable returns and moderate valuations
-    - **33–45%**: Low Risk: Generally safe, but may have mild risk factors like debt or sector exposure.
-    - **45–55%**: Moderate Risk: Balanced risk-return profile. Could be cyclical stocks or modest growth plays.
-    - **55–67%**: High Risk: Often volatile, overvalued, or leveraged. May include tech/growth names. 
-    - **67–80%**: Very High Risk: Speculative, unprofitable, or experiencing financial strain. Momentum-driven.
-    - **80–100%**: Extremely High Risk: Loss-making or hype-driven companies with unstable fundamentals. Not suitable for conservative investors.
+    - **0–20%: Extremely Low Risk** — Blue-chip stability, minimal volatility  
+    - **20–33%: Very Low Risk** — Conservative, low-debt companies  
+    - **33–45%: Low Risk** — Financially sound with minor concerns  
+    - **45–55%: Moderate Risk** — Balanced profile  
+    - **55–67%: High Risk** — Growth-focused, some valuation stretch  
+    - **67–80%: Very High Risk** — Speculative or structurally weak  
+    - **80–100%: Extremely High Risk** — Red flags: overvalued, distressed, or hype-driven
     """)
