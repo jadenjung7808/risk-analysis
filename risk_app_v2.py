@@ -3,17 +3,16 @@ import yfinance as yf
 import numpy as np
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="Stable Risk Analyzer", layout="centered")
-st.title("Portfolio Risk Analyzer (Stable Version)")
+st.set_page_config(page_title="Restored Risk Analyzer", layout="centered")
+st.title("📊 Accurate & Reliable Investment Risk Analyzer")
 
-# ✅ 균형 잡힌 가중치 (안정성 강조)
+# 어제 모델 기반 가중치
 weights = {
-    "PE": 0.13, "PS": 0.10, "D/E": 0.13, "Margin": 0.13,
-    "Dividend": 0.08, "Volatility": 0.10, "Drawdown": 0.10,
-    "Beta": 0.08, "Liquidity": 0.10, "ESG": 0.05
+    "PE": 0.15, "PS": 0.10, "D/E": 0.15, "Margin": 0.15,
+    "Dividend": 0.05, "Volatility": 0.10, "Drawdown": 0.10,
+    "Beta": 0.05, "Liquidity": 0.10, "ESG": 0.05
 }
 
-# ✅ 조정된 스케일
 scales = {
     "PE": 60, "PS": 15, "D/E": 300, "Margin": 1.0,
     "Volatility": 0.05, "Drawdown": 0.3, "Beta": 2.0,
@@ -23,12 +22,11 @@ scales = {
 def normalize(x, key):
     try:
         if key == "Dividend":
-            return 0 if (x is not None and x > 0) else 100
+            return 0 if x else 100
         x = abs(float(x))
-        score = min(x / scales[key], 1.0) * 100
-        return round(score, 2)
+        return max(0, min((x / scales[key]) * 100, 100))
     except:
-        return 50  # fallback 점수
+        return 50
 
 def interpret_risk(score):
     if score <= 20: return "Extremely Low Risk"
@@ -75,7 +73,7 @@ st.button("➕ Add Stock", on_click=add_row)
 portfolio = []
 for i, entry in enumerate(st.session_state.tickers):
     cols = st.columns([2, 1, 0.3])
-    name = cols[0].text_input(f"Stock {i+1}", value=entry["name"], key=f"name_{i}", placeholder="e.g., AAPL")
+    name = cols[0].text_input(f"Stock {i+1}", value=entry["name"], key=f"name_{i}", placeholder="e.g., OKLO")
     amount = cols[1].text_input("Amount ($)", value=entry["amount"], key=f"amount_{i}", placeholder="$")
     remove = cols[2].button("❌", key=f"remove_{i}")
     if remove:
@@ -86,19 +84,18 @@ for i, entry in enumerate(st.session_state.tickers):
     if name and amount.replace(".", "", 1).isdigit():
         portfolio.append((name.upper(), float(amount)))
 
-selected_period = st.selectbox("Investment Period", ["1mo", "3mo", "6mo", "1y", "2y"], index=3)
+selected_period = st.selectbox("Select Investment Period", ["1mo", "3mo", "6mo", "1y", "2y"], index=3)
 
 def calculate_risk(ticker, period="1y"):
     try:
         stock = yf.Ticker(ticker)
         hist = stock.history(period=period)
         if hist.empty:
-            return None, {}, {}, False
+            return None, {}, {}
 
         close = hist["Close"]
-        returns = close.pct_change().dropna()
-        price = close[-1]
         volume = hist["Volume"].mean()
+        returns = close.pct_change().dropna()
 
         info = stock.info
         spy = yf.Ticker("SPY").history(period=period)
@@ -113,9 +110,6 @@ def calculate_risk(ticker, period="1y"):
         liquidity = volume
         esg = info.get("esgScores", {}).get("totalEsg", 50)
 
-        # 상장폐지 경고 조건
-        delist_risk = price < 1 or liquidity < 10000 or info.get("quoteType", "") == "otc"
-
         raw_scores = {
             "PE": normalize(pe, "PE"),
             "PS": normalize(ps, "PS"),
@@ -124,28 +118,25 @@ def calculate_risk(ticker, period="1y"):
             "Dividend": normalize(dy, "Dividend"),
             "Volatility": normalize(np.std(returns), "Volatility"),
             "Drawdown": normalize((close / close.cummax() - 1).min(), "Drawdown"),
-            "Beta": normalize(beta, "Beta"),
+            "Beta": normalize(abs(beta), "Beta"),
             "Liquidity": normalize(1_000_000 / liquidity, "Liquidity"),
             "ESG": normalize(esg, "ESG")
         }
 
         weighted = {k: raw_scores[k] * weights[k] for k in raw_scores}
-        total = sum(weighted.values())
-        if delist_risk:
-            total = min(total + 30, 100)
-
-        return round(total, 2), weighted, raw_scores, delist_risk
+        total = round(sum(weighted.values()), 2)
+        return total, weighted, raw_scores
     except:
-        return None, {}, {}, False
+        return None, {}, {}
 
-if st.button("📊 Analyze Risk"):
+if st.button("📊 Analyze Portfolio Risk"):
     if not portfolio:
-        st.warning("⚠️ Please enter at least one stock.")
+        st.warning("⚠️ Please enter at least one valid stock.")
     else:
         results = []
         total_amt = sum(amt for _, amt in portfolio)
         for ticker, amt in portfolio:
-            r, _, _, _ = calculate_risk(ticker, selected_period)
+            r, _, _ = calculate_risk(ticker, selected_period)
             if r is not None:
                 results.append((ticker, r, amt))
 
@@ -153,20 +144,18 @@ if st.button("📊 Analyze Risk"):
             port_score = round(sum(r * a for _, r, a in results) / total_amt, 2)
             st.markdown(f"""
                 <div style="background-color:{risk_color(port_score)}; padding:20px; border-radius:10px">
-                <h3>📈 Portfolio Risk: {port_score}%</h3>
+                <h3>💼 Portfolio Risk: {port_score}%</h3>
                 <b>{interpret_risk(port_score)}</b>
                 </div>
             """, unsafe_allow_html=True)
 
         for ticker, score, amt in results:
             st.subheader(f"📍 {ticker}")
-            score, weighted, raw, delist_flag = calculate_risk(ticker, selected_period)
-            if delist_flag:
-                st.error("⚠️ Delisting Warning: This stock may have regulatory or liquidity concerns.")
-
+            score, weighted, raw = calculate_risk(ticker, selected_period)
             st.markdown(f"**Risk Score: {score}% — {interpret_risk(score)}**")
             st.markdown(f"<div style='background-color:{risk_color(score)}; height:15px;'></div>", unsafe_allow_html=True)
 
+            # Bar chart and Radar chart side-by-side
             top3 = sorted(weighted.items(), key=lambda x: x[1], reverse=True)[:3]
             labels = [x[0] for x in top3]
             values = [x[1] for x in top3]
@@ -180,39 +169,38 @@ if st.button("📊 Analyze Risk"):
 
             with col2:
                 angles = np.linspace(0, 2 * np.pi, len(raw), endpoint=False).tolist()
-                values = list(raw.values())
-                values += values[:1]
-                angles += angles[:1]
+                values_all = list(raw.values()) + [list(raw.values())[0]]
+                angles += [angles[0]]
                 fig2, ax2 = plt.subplots(subplot_kw=dict(polar=True))
-                ax2.plot(angles, values, 'o-', linewidth=2)
-                ax2.fill(angles, values, alpha=0.25)
+                ax2.plot(angles, values_all, 'o-', linewidth=2)
+                ax2.fill(angles, values_all, alpha=0.25)
                 ax2.set_xticks(angles[:-1])
                 ax2.set_xticklabels(list(raw.keys()))
                 ax2.set_title("Risk Radar")
                 st.pyplot(fig2)
 
-            st.markdown("### 📰 Related News")
-            st.markdown(f"[Search {ticker} News on Google](https://www.google.com/search?q={ticker}+stock+news)")
+            st.markdown("### 📰 Google News Link")
+            st.markdown(f"[Search '{ticker} stock news' on Google](https://www.google.com/search?q={ticker}+stock+news)")
 
-            st.markdown("### 💡 Risk Factor Explanation")
+            st.markdown("### 💡 Top Risk Factor Explanations")
             for k in labels:
                 st.markdown(f"- **{k}**: {explanations[k]}")
 
-with st.expander("Risk % ?"):
+with st.expander("📊 What Does the Risk % Mean?"):
     st.markdown("""
-- **0–20%**: Extremely Low Risk  
-- **20–33%**: Very Low Risk  
-- **33–45%**: Low Risk  
-- **45–55%**: Moderate Risk  
-- **55–67%**: High Risk  
-- **67–80%**: Very High Risk  
-- **80–100%**: Extremely High Risk  
+- 0–20%: Extremely Low Risk  
+- 20–33%: Very Low Risk  
+- 33–45%: Low Risk  
+- 45–55%: Moderate Risk  
+- 55–67%: High Risk  
+- 67–80%: Very High Risk  
+- 80–100%: Extremely High Risk  
 """)
 
-with st.expander("How We Calculate Risk"):
+with st.expander("🧮 How Risk Is Calculated"):
     st.markdown("""
-- Weighted score from 10 indicators  
-- Each score normalized and scaled 0–100  
-- Delisting warning adds +30 risk  
-- Final risk is capped at 100%  
+- Based on 10 indicators with weighted scores  
+- Normalized between 0–100 per industry scale  
+- Outliers clipped to avoid distortion  
+- Risk score = sum of all weighted factors  
 """)
