@@ -6,28 +6,24 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Portfolio Risk Analyzer", layout="centered")
 st.title("Portfolio Risk Analyzer")
 
-# 가중치
+# ✅ 가중치와 스케일
 weights = {
     "PE": 0.18, "PS": 0.12, "D/E": 0.15, "Margin": 0.15,
     "Dividend": 0.03, "Volatility": 0.10, "Drawdown": 0.10,
     "Beta": 0.07, "Liquidity": 0.05, "ESG": 0.05
 }
 
-# 리스크 점수 중심화용 스케일
 scales = {
-    "PE": 40, "PS": 10, "D/E": 200, "Margin": 0.5,
-    "Volatility": 0.03, "Drawdown": 0.2, "Beta": 1.5,
-    "Liquidity": 2000000, "ESG": 80
+    "PE": 60, "PS": 15, "D/E": 300, "Margin": 1.0,
+    "Volatility": 0.05, "Drawdown": 0.3, "Beta": 2.0,
+    "Liquidity": 1_000_000, "ESG": 100
 }
 
-# √x 정규화
 def normalize(x, key):
     if key == "Dividend":
         return 0 if x else 100
-    raw = min(x / scales[key], 1)
-    return (raw ** 0.5) * 100
+    return min(x / scales[key], 1) * 100
 
-# 설명
 explanations = {
     "PE": "High PE = possibly overvalued.",
     "PS": "High PS = expensive vs. revenue.",
@@ -41,7 +37,7 @@ explanations = {
     "ESG": "Environmental/social/governance concerns."
 }
 
-# 입력창 초기화
+# ✅ 종목 입력 처리
 if "tickers" not in st.session_state:
     st.session_state.tickers = [{"name": "", "amount": ""}]
 
@@ -53,7 +49,6 @@ def remove_row(index):
 
 st.button("➕ Add Stock", on_click=add_row)
 
-# 입력창 UI
 portfolio = []
 for i, entry in enumerate(st.session_state.tickers):
     cols = st.columns([2, 1, 0.3])
@@ -68,10 +63,10 @@ for i, entry in enumerate(st.session_state.tickers):
     if name and amount.replace(".", "", 1).isdigit():
         portfolio.append((name.upper(), float(amount)))
 
-# 기간 선택
+# ✅ 투자 기간 선택
 selected_period = st.selectbox("Select Investment Period", ["1mo", "3mo", "6mo", "1y", "2y"], index=2)
 
-# 리스크 해석
+# ✅ 리스크 해석과 색상
 def interpret_risk(score):
     if score is None: return "N/A"
     elif score <= 20: return "Extremely Low Risk"
@@ -92,14 +87,13 @@ def risk_color(score):
     elif score <= 80: return "#e74c3c"
     else: return "#000000"
 
-# 리스크 계산
+# ✅ 리스크 계산 함수
 def calculate_components(ticker, period="1y"):
     try:
         stock = yf.Ticker(ticker)
         hist = stock.history(period=period)
         spy = yf.Ticker("SPY").history(period=period)
-        if hist.empty or spy.empty:
-            return None, {}, {}
+        if hist.empty or spy.empty: return None, {}, {}
 
         close = hist["Close"]
         volume = hist["Volume"].mean()
@@ -111,7 +105,7 @@ def calculate_components(ticker, period="1y"):
         dy = stock.info.get("dividendYield")
         dte = stock.info.get("debtToEquity") or 300
         margin = stock.info.get("operatingMargins") or 0.2
-        avg_volume = volume or 1000000
+        avg_volume = volume or 1_000_000
         esg = stock.info.get("esgScores", {}).get("totalEsg", 50)
 
         raw_scores = {
@@ -123,7 +117,7 @@ def calculate_components(ticker, period="1y"):
             "Volatility": normalize(np.std(returns), "Volatility"),
             "Drawdown": normalize((close / close.cummax() - 1).min(), "Drawdown"),
             "Beta": normalize(np.cov(returns, spy_returns)[0, 1] / np.cov(returns, spy_returns)[1, 1], "Beta"),
-            "Liquidity": normalize(1000000 / avg_volume, "Liquidity"),
+            "Liquidity": normalize(1_000_000 / avg_volume, "Liquidity"),
             "ESG": normalize(esg, "ESG")
         }
 
@@ -134,10 +128,10 @@ def calculate_components(ticker, period="1y"):
     except:
         return None, {}, {}
 
-# 분석 실행
+# ✅ 분석 버튼
 if st.button("📊 Analyze Risk"):
     if not portfolio:
-        st.warning("⚠️ Please enter at least one stock.")
+        st.warning("⚠️ Please enter at least one valid stock and amount.")
     else:
         risks = []
         total_amount = sum([amt for _, amt in portfolio])
@@ -147,77 +141,57 @@ if st.button("📊 Analyze Risk"):
                 risks.append((ticker, r, amt))
 
         if risks:
-            total_score = round(sum(r * a for _, r, a in risks) / total_amount, 2)
-            st.markdown(f"### 💡 Total Portfolio Risk: **{total_score}%** — {interpret_risk(total_score)}")
-            st.markdown(f"<div style='background-color:{risk_color(total_score)}; height:20px'></div>", unsafe_allow_html=True)
+            portfolio_risk = round(sum(r * a for _, r, a in risks) / total_amount, 2)
+            st.markdown(f"## 💡 Total Portfolio Risk: **{portfolio_risk}%** — {interpret_risk(portfolio_risk)}")
+            st.markdown(f"<div style='background-color:{risk_color(portfolio_risk)}; height:20px'></div>", unsafe_allow_html=True)
 
         for ticker, risk, amt in risks:
-            st.subheader(f" {ticker}")
-            _, weighted, raw = calculate_components(ticker, selected_period)
-            st.write(f"Risk: **{risk}%** — {interpret_risk(risk)}")
+            st.subheader(f"📍 {ticker}")
+            total, weighted, raw = calculate_components(ticker, selected_period)
+            st.markdown(f"Risk: **{total}%** — {interpret_risk(total)}")
+            st.markdown(f"<div style='background-color:{risk_color(total)}; height:15px'></div>", unsafe_allow_html=True)
 
+            # 막대 그래프
             top3 = sorted(weighted.items(), key=lambda x: x[1], reverse=True)[:3]
             labels = [x[0] for x in top3]
             values = [x[1] for x in top3]
+            fig, ax = plt.subplots()
+            ax.bar(labels, values)
+            st.pyplot(fig)
 
-            col1, col2 = st.columns(2)
-            with col1:
-                fig, ax = plt.subplots()
-                ax.bar(labels, values)
-                ax.set_title("Top 3 Risk Contributors")
-                st.pyplot(fig)
+            # 레이더 차트
+            raw_vals = [raw[k] for k in raw]
+            angles = np.linspace(0, 2 * np.pi, len(raw), endpoint=False).tolist()
+            raw_vals += raw_vals[:1]
+            angles += angles[:1]
+            fig2, ax2 = plt.subplots(subplot_kw=dict(polar=True))
+            ax2.plot(angles, raw_vals, 'o-', linewidth=2)
+            ax2.fill(angles, raw_vals, alpha=0.25)
+            ax2.set_xticks(angles[:-1])
+            ax2.set_xticklabels(list(raw.keys()))
+            st.pyplot(fig2)
 
-            with col2:
-                all_labels = list(raw.keys())
-                raw_vals = [raw[k] for k in all_labels]
-                angles = np.linspace(0, 2 * np.pi, len(all_labels), endpoint=False).tolist()
-                raw_vals += raw_vals[:1]
-                angles += angles[:1]
-                fig, ax = plt.subplots(subplot_kw=dict(polar=True))
-                ax.plot(angles, raw_vals, 'o-', linewidth=2)
-                ax.fill(angles, raw_vals, alpha=0.25)
-                ax.set_xticks(angles[:-1])
-                ax.set_xticklabels(all_labels)
-                st.pyplot(fig)
-
-            st.markdown("### Risk Explanation")
+            # 설명
+            st.markdown("### Explanation of Top Risk Factors")
             for k in labels:
-                st.markdown(f"**{k}**: {explanations[k]}  \n🔗 [Search News](https://www.google.com/search?q={ticker}+{k}+stock+news)", unsafe_allow_html=True)
-# 리스크 퍼센트 의미 설명
-with st.expander(" What Does the Risk % Mean?"):
-    st.markdown("""
-    - **0–20%**: Extremely Low Risk — Blue-chip stability, minimal volatility  
-    - **20–33%**: Very Low Risk — Conservative, low-debt companies  
-    - **33–45%**: Low Risk — Financially sound with minor concerns  
-    - **45–55%**: Moderate Risk — Balanced profile  
-    - **55–67%**: High Risk — Growth-focused, some valuation stretch  
-    - **67–80%**: Very High Risk — Speculative or structurally weak  
-    - **80–100%**: Extremely High Risk — Red flags: overvalued, distressed, or hype-driven
-    """)
+                st.markdown(f"- **{k}**: {explanations[k]}")
 
-# 리스크 산정 방식 안내 버튼
+# ✅ 리스크 의미 설명
+with st.expander("Risk % ?"):
+    st.markdown("""
+- **0–20%**: Extremely Low Risk - stable, minimal volatility  
+- **20–33%**: Very Low Risk - Conservative, low-debt companies  
+- **33–45%**: Low Risk - Financially sound with minor concerns  
+- **45–55%**: Moderate Risk - Balanced profile- risk & profit
+- **55–67%**: High Risk - Growth-focused, some valuation stretch  
+- **67–80%**: Very High Risk - Speculative or structurally weak  
+- **80–100%**: Extremely High Risk - Red flags: overvalued, distressed  
+""")
+
+# ✅ 계산 방식 설명
 with st.expander("How Do We Calculate Risk?"):
     st.markdown("""
-    ### Risk Score = Weighted Sum of 10 Factors:
-    - **PE Ratio (18%)**: Higher → riskier
-    - **PS Ratio (12%)**: Higher → riskier
-    - **D/E Ratio (15%)**: Higher → riskier
-    - **Operating Margin (15%)**: Lower → riskier
-    - **Dividend Yield (3%)**: No dividend → riskier
-    - **Volatility (10%)**: Higher std dev → riskier
-    - **Drawdown (10%)**: Larger past loss → riskier
-    - **Beta (7%)**: High market sensitivity
-    - **Liquidity (5%)**: Lower avg volume → riskier
-    - **ESG Score (5%)**: Higher ESG risk score → riskier
-
-    ### 📌 Scores are normalized using √x scale for more balanced distribution (avg 40–60%).
-    """)
-
-# 데이터 한계 설명
-with st.expander("🔎 Data Sources & Limitations"):
-    st.markdown("""
-    - Source: Yahoo Finance via yFinance
-    - ESG data may be missing for some tickers
-    - No qualitative factors (news sentiment, fraud, litigation)
-    - Some microcaps or OTC stocks may lack complete data
-    """)
+- Risk is calculated from 10 indicators using weighted normalization.
+- Each score is scaled relative to financial norms (e.g., PE 60, D/E 300).
+- Final portfolio risk = weighted average based on input dollar amount.
+""")
