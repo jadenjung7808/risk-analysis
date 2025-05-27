@@ -203,5 +203,5 @@ with st.expander("ℹ️ How Risk Is Calculated"):
 - Normalized between 0–100 per industry scale  
 - Outliers clipped to avoid distortion  
 - Risk score = sum of all weighted factors 
-- No Qualitative data
+- No Qualitative data - except ESG score
 """)
