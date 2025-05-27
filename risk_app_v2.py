@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Restored Risk Analyzer", layout="centered")
-st.title("📊 Accurate & Reliable Investment Risk Analyzer")
+st.title("Investment Risk Analyzer")
 
 # 어제 모델 기반 가중치
 weights = {
@@ -73,7 +73,7 @@ st.button("➕ Add Stock", on_click=add_row)
 portfolio = []
 for i, entry in enumerate(st.session_state.tickers):
     cols = st.columns([2, 1, 0.3])
-    name = cols[0].text_input(f"Stock {i+1}", value=entry["name"], key=f"name_{i}", placeholder="e.g., OKLO")
+    name = cols[0].text_input(f"Stock {i+1}", value=entry["name"], key=f"name_{i}", placeholder="e.g., AAPL")
     amount = cols[1].text_input("Amount ($)", value=entry["amount"], key=f"amount_{i}", placeholder="$")
     remove = cols[2].button("❌", key=f"remove_{i}")
     if remove:
@@ -129,7 +129,7 @@ def calculate_risk(ticker, period="1y"):
     except:
         return None, {}, {}
 
-if st.button("📊 Analyze Portfolio Risk"):
+if st.button("📊 Analyze Risk"):
     if not portfolio:
         st.warning("⚠️ Please enter at least one valid stock.")
     else:
@@ -144,7 +144,7 @@ if st.button("📊 Analyze Portfolio Risk"):
             port_score = round(sum(r * a for _, r, a in results) / total_amt, 2)
             st.markdown(f"""
                 <div style="background-color:{risk_color(port_score)}; padding:20px; border-radius:10px">
-                <h3>💼 Portfolio Risk: {port_score}%</h3>
+                <h3> Portfolio Risk: {port_score}%</h3>
                 <b>{interpret_risk(port_score)}</b>
                 </div>
             """, unsafe_allow_html=True)
@@ -186,18 +186,18 @@ if st.button("📊 Analyze Portfolio Risk"):
             for k in labels:
                 st.markdown(f"- **{k}**: {explanations[k]}")
 
-with st.expander("📊 What Does the Risk % Mean?"):
+with st.expander("ℹ️ Risk % ?"):
     st.markdown("""
-- 0–20%: Extremely Low Risk  
-- 20–33%: Very Low Risk  
-- 33–45%: Low Risk  
-- 45–55%: Moderate Risk  
-- 55–67%: High Risk  
-- 67–80%: Very High Risk  
-- 80–100%: Extremely High Risk  
+- 0–20%: Extremely Low Risk - stable, minimal volatility  
+- 20–33%: Very Low Risk - Conservative, low-debt companies 
+- 33–45%: Low Risk - Financially sound with minor concerns 
+- 45–55%: Moderate Risk - Balanced profile- risk & profit 
+- 55–67%: High Risk - Growth-focused, some valuation stretch 
+- 67–80%: Very High Risk - Speculative or structurally weak  
+- 80–100%: Extremely High Risk - Red flags: overvalued, distressed
 """)
 
-with st.expander("🧮 How Risk Is Calculated"):
+with st.expander("ℹ️ How Risk Is Calculated"):
     st.markdown("""
 - Based on 10 indicators with weighted scores  
 - Normalized between 0–100 per industry scale  
