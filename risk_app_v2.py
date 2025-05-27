@@ -211,4 +211,5 @@ with st.expander("How We Calculate Risk"):
 - Weighted score of 10 indicators normalized to typical market ranges  
 - Risk increased +30% if delisting risk detected  
 - Data sourced from Yahoo Finance (via yFinance)
+- No qualitative data
 """)
