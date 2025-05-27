@@ -193,7 +193,7 @@ with st.expander("ℹ️ Risk % ?"):
 - 33–45%: Low Risk - Financially sound with minor concerns 
 - 45–55%: Moderate Risk - Balanced profile- risk & profit 
 - 55–67%: High Risk - Growth-focused, some valuation stretch 
-- 67–80%: Very High Risk - Speculative or structurally weak  
+- 67–80%: Very High Risk - Speculative or structurally weak + a lot of major problems 
 - 80–100%: Extremely High Risk - Red flags: overvalued, distressed
 """)
 
