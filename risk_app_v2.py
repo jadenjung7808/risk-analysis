@@ -202,5 +202,6 @@ with st.expander("ℹ️ How Risk Is Calculated"):
 - Based on 10 indicators with weighted scores  
 - Normalized between 0–100 per industry scale  
 - Outliers clipped to avoid distortion  
-- Risk score = sum of all weighted factors  
+- Risk score = sum of all weighted factors 
+- No Qualitative data
 """)
