@@ -205,13 +205,13 @@ if st.button("📊 Analyze Risk"):
                 st.markdown(f"**{factor}**: {desc}  \n🔗 [Search News]({link})", unsafe_allow_html=True)
 
 # 리스크 퍼센트 의미 설명
-with st.expander("Risk % ?"):
+with st.expander("ℹ️ Risk % ?"):
     st.markdown("""
-    - **0–20%**: Extremely Low Risk  
-    - **20–33%**: Very Low Risk  
-    - **33–45%**: Low Risk  
-    - **45–55%**: Moderate Risk  
-    - **55–67%**: High Risk  
-    - **67–80%**: Very High Risk  
-    - **80–100%**: Extremely High Risk
+    - **0–20%**: Extremely Low Risk: strong financials, very low volatility. Ideal for capital preservation.  
+    - **20–33%**: Very Low Risk: Reliable companies with stable returns and moderate valuations
+    - **33–45%**: Low Risk: Generally safe, but may have mild risk factors like debt or sector exposure.
+    - **45–55%**: Moderate Risk: Balanced risk-return profile. Could be cyclical stocks or modest growth plays.
+    - **55–67%**: High Risk: Often volatile, overvalued, or leveraged. May include tech/growth names. 
+    - **67–80%**: Very High Risk: Speculative, unprofitable, or experiencing financial strain. Momentum-driven.
+    - **80–100%**: Extremely High Risk: Loss-making or hype-driven companies with unstable fundamentals. Not suitable for conservative investors.
     """)
