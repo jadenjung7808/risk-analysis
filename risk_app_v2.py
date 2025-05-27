@@ -182,7 +182,7 @@ if st.button("📊 Analyze Risk"):
             st.markdown("### 📰 Google News Link")
             st.markdown(f"[Search '{ticker} stock news' on Google](https://www.google.com/search?q={ticker}+stock+news)")
 
-            st.markdown("### 💡 Top Risk Factor Explanations")
+            st.markdown("###  Top Risk Factor Explanations")
             for k in labels:
                 st.markdown(f"- **{k}**: {explanations[k]}")
 
