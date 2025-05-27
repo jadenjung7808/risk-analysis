@@ -6,32 +6,39 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Portfolio Risk Analyzer", layout="centered")
 st.title("Portfolio Risk Analyzer")
 
-# 설명: 리스크 계산 방식
-with st.expander("ℹ️ How We Calculate the Risk Score"):
+# ✅ 통합 설명 버튼
+with st.expander("ℹ️ How We Calculate Risk & What Data We Use"):
     st.markdown("""
-    Our risk score combines multiple indicators:
+    ### 🔢 How We Calculate the Risk Score
+    Our score is based on 10 indicators. Each is normalized and weighted:
 
-    - **Valuation Risk** → PE, PS (high = overvalued)  
-    - **Financial Health** → D/E, Margin (low margin or high debt = high risk)  
-    - **Market Sensitivity** → Beta, Volatility, Drawdown (unstable stocks)  
-    - **Liquidity Risk** → Low trading volume = harder to exit  
-    - **ESG Risk** → Higher ESG score = more sustainability concerns
+    **Valuation Risk**
+    - PE Ratio: Higher = more overvalued → Higher Risk
+    - PS Ratio: Higher = more expensive vs. revenue → Higher Risk
 
-    Each metric is normalized and weighted. The total score is on a 0–100 scale.
+    **Financial Health**
+    - Debt-to-Equity: Higher = more leverage → Higher Risk
+    - Operating Margin: Lower = less profitable → Higher Risk
+    - Dividend Yield: Low or none = uncertain income → Higher Risk
+
+    **Market Behavior**
+    - Volatility: Higher = more unstable → Higher Risk
+    - Drawdown: Larger = more vulnerable to loss → Higher Risk
+    - Beta: Higher = more sensitive to market → Higher Risk
+
+    **Liquidity**
+    - Avg Volume: Lower = harder to sell → Higher Risk
+
+    **Sustainability**
+    - ESG Score: Higher = more governance/environment/social concern → Higher Risk
+
+    ### 📘 Data Limitations
+    - ✅ Uses Yahoo Finance for all financials
+    - ✅ ESG scores if available
+    - ❌ No legal, news, controversy, employee ratings
     """)
 
-# 설명: 포함/제외된 데이터
-with st.expander("📘 Data Coverage & Limitations"):
-    st.markdown("""
-    - ✅ Public financial & market data from Yahoo Finance  
-    - ✅ ESG score included (if available)  
-    - ❌ Legal issues, controversy events, social media, employee ratings  
-    - ❌ News-based or reputation risk
-
-    This tool only covers measurable, publicly available quantitative data.
-    """)
-
-# 종목 입력
+# 📥 사용자 입력
 if "tickers" not in st.session_state:
     st.session_state.tickers = [{"name": "", "amount": ""}]
 
@@ -79,13 +86,6 @@ def risk_color(score):
     elif score <= 80: return "rgba(231, 76, 60, 0.25)"
     else: return "rgba(0, 0, 0, 0.25)"
 
-def volatility(returns): return np.std(returns)
-def drawdown(close): return (close / close.cummax() - 1).min()
-def beta_calc(returns, benchmark_returns):
-    if len(returns) != len(benchmark_returns): return None
-    cov_matrix = np.cov(returns, benchmark_returns)
-    return cov_matrix[0, 1] / cov_matrix[1, 1]
-
 def calculate_components(ticker, period="1y"):
     try:
         stock = yf.Ticker(ticker)
@@ -105,7 +105,7 @@ def calculate_components(ticker, period="1y"):
         dte = stock.info.get("debtToEquity") or 300
         margin = stock.info.get("operatingMargins") or 0.2
         avg_volume = volume or 1000000
-        esg = stock.info.get("esgScores", {}).get("totalEsg", None)
+        esg = stock.info.get("esgScores", {}).get("totalEsg", 50)
 
         weights = {
             "PE": 0.14, "PS": 0.10, "D/E": 0.10, "Margin": 0.10,
@@ -120,25 +120,25 @@ def calculate_components(ticker, period="1y"):
             "D/E": score(dte, 300) * weights["D/E"],
             "Margin": score((1 - margin), 1) * weights["Margin"],
             "Dividend": (0 if dy else 100) * weights["Dividend"],
-            "Volatility": score(volatility(returns), 0.05) * weights["Volatility"],
-            "Drawdown": score(abs(drawdown(close)), 0.3) * weights["Drawdown"],
-            "Beta": score(beta_calc(returns, spy_returns) or 1, 2) * weights["Beta"],
+            "Volatility": score(np.std(returns), 0.05) * weights["Volatility"],
+            "Drawdown": score((close / close.cummax() - 1).min(), 0.3) * weights["Drawdown"],
+            "Beta": score(np.cov(returns, spy_returns)[0,1] / np.cov(returns, spy_returns)[1,1], 2) * weights["Beta"],
             "Liquidity": score(1000000 / avg_volume, 1) * weights["Liquidity"],
-            "ESG": score(esg if esg is not None else 50, 100) * weights["ESG"]
+            "ESG": score(esg, 100) * weights["ESG"]
         }
 
         return round(sum(scores.values()), 2), scores
     except:
         return None, {}
 
-# 결과 출력
+# 📊 결과 표시
 if st.button("📊 Analyze Risk"):
     if not portfolio:
         st.warning("⚠️ Please enter at least one valid stock and amount.")
     else:
-        st.markdown("---")
         risks = []
         total_amount = sum([amt for _, amt in portfolio])
+
         for ticker, amt in portfolio:
             r, _ = calculate_components(ticker, selected_period)
             if r is not None:
@@ -156,47 +156,53 @@ if st.button("📊 Analyze Risk"):
             """, unsafe_allow_html=True)
 
         for ticker, risk, amt in risks:
-            st.subheader(f" {ticker} ({selected_period})")
+            st.subheader(f"📍 {ticker} ({selected_period})")
             _, scores = calculate_components(ticker, selected_period)
             contribution = (risk * amt / total_amount)
-            st.markdown(f" Contribution to Portfolio Risk: **{contribution:.1f}%**")
+            st.markdown(f"📌 Contribution to Portfolio Risk: **{contribution:.1f}%**")
 
             top_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:3]
             labels = [x[0] for x in top_scores]
             values = [x[1] for x in top_scores]
-            colors = ["#3498db80", "#f39c1280", "#e74c3c80"]
 
-            fig, ax = plt.subplots()
-            bars = ax.bar(labels, values, color=colors)
-            for bar in bars:
-                yval = bar.get_height()
-                ax.text(bar.get_x() + bar.get_width()/2.0, yval, f'{yval:.1f}%', va='bottom', ha='center')
-            ax.set_ylabel("Risk Contribution (%)")
-            ax.set_title(f"{ticker} - Top 3 Risk Drivers")
-            st.pyplot(fig)
+            col1, col2 = st.columns(2)
 
-# 리스크 % 설명
-with st.expander(" 📘 Risk % ?"):
+            with col1:
+                fig, ax = plt.subplots()
+                ax.bar(labels, values, color=["#3498db80", "#f39c1280", "#e74c3c80"])
+                ax.set_ylabel("Contribution (%)")
+                ax.set_title("Top 3 Risk Drivers")
+                st.pyplot(fig)
+
+            with col2:
+                radar_labels = list(scores.keys())
+                radar_values = [scores[k] for k in radar_labels]
+                angles = np.linspace(0, 2 * np.pi, len(radar_labels), endpoint=False).tolist()
+                radar_values += radar_values[:1]
+                angles += angles[:1]
+                fig, ax = plt.subplots(subplot_kw=dict(polar=True))
+                ax.plot(angles, radar_values, 'o-', linewidth=2)
+                ax.fill(angles, radar_values, alpha=0.25)
+                ax.set_xticks(angles[:-1])
+                ax.set_xticklabels(radar_labels)
+                ax.set_title("Risk Profile (Radar Chart)", size=12)
+                st.pyplot(fig)
+
+# 📊 리스크 퍼센트 의미 설명
+with st.expander(" Risk % ?"):
     st.markdown("""
     - **0–20%: Extremely Low Risk**  
+      → Blue-chip stocks like JNJ, KO. Ideal for long-term safety.  
     - **20–33%: Very Low Risk**  
+      → Solid fundamentals with minimal volatility  
     - **33–45%: Low Risk**  
+      → Generally stable, but some weakness  
     - **45–55%: Moderate Risk**  
+      → Balanced but with noticeable risk signals  
     - **55–67%: High Risk**  
+      → Volatile, growth-heavy or overvalued firms  
     - **67–80%: Very High Risk**  
-    - **80–100%: Extremely High Risk**
-    """)
-
-# 리스크 지표 설명
-with st.expander("📘 Explanation of Risk Indicators"):
-    st.markdown("""
-    - PE, PS → Higher = Higher Risk  
-    - D/E → Higher = Higher Risk  
-    - Margin → Lower = Higher Risk  
-    - Dividend → Lower = Higher Risk  
-    - Volatility → Higher = Higher Risk  
-    - Drawdown → Larger = Higher Risk  
-    - Beta → Higher = Higher Risk  
-    - Liquidity (volume) → Lower = Higher Risk  
-    - ESG Score → Higher = Higher Risk
+      → Speculative or unstable business model  
+    - **80–100%: Extremely High Risk**  
+      → Loss-making, hype-driven, or distressed companies
     """)
